@@ -1,0 +1,48 @@
+{
+  "private": true,
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev --turbopack",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@heroicons/react": "^2.2.0",
+    "@radix-ui/react-accordion": "^1.2.3",
+    "@radix-ui/react-select": "^2.1.6",
+    "@radix-ui/react-slider": "^1.2.3",
+    "@react-google-maps/api": "^2.20.6",
+    "@tailwindcss/forms": "^0.5.10",
+    "@types/google-maps": "^4.0.0",
+    "@types/leaflet": "^1.9.16",
+    "bcryptjs": "^2.4.3",
+    "clsx": "^2.1.1",
+    "leaflet": "^1.9.4",
+    "leaflet-routing-machine": "^3.2.12",
+    "lodash": "^4.17.21",
+    "lucide-react": "^0.475.0",
+    "next": "15.2.0-canary.51",
+    "next-auth": "5.0.0-beta.25",
+    "postgres": "^3.4.5",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-leaflet": "^5.0.0",
+    "react-leaflet-routing-machine": "^0.0.5",
+    "typescript": "5.7.3",
+    "use-debounce": "^10.0.4",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/lodash": "^4.17.15",
+    "@types/node": "22.10.7",
+    "@types/react": "19.0.7",
+    "@types/react-dom": "19.0.3",
+    "@typescript-eslint/eslint-plugin": "8.24.0",
+    "@typescript-eslint/parser": "8.24.0",
+    "autoprefixer": "10.4.20",
+    "eslint-config-next": "15.1.7",
+    "postcss": "8.5.1",
+    "tailwindcss": "3.4.17"
+  }
+}
