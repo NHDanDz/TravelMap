@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Tam giác cảnh báo nền đỏ -->
+  <path d="M16 2 L30 26 L2 26 Z" fill="#ff3333" stroke="#cc0000" stroke-width="1.5" />
+  
+  <!-- Dấu chấm than màu trắng -->
+  <circle cx="16" cy="21" r="1.8" fill="white" />
+  <rect x="14.5" y="10" width="3" height="8" rx="1.5" fill="white" />
+</svg>

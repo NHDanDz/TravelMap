@@ -1,10 +1,50 @@
-// app/dashboard/Map/components/SatelliteMapComponent.tsx
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Rectangle, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import LandslideMarkerLayer from './LandslideMarkerLayer';
+
+// Định nghĩa các kiểu dữ liệu
+interface LandslideCoordinate {
+  segment_id: string;
+  east: number;
+  north: number;
+}
+
+interface LandslideResult {
+  id: string;
+  status: string;
+  landslideDetected?: boolean;
+  landslide_coordinates?: { 
+    coordinates: LandslideCoordinate[] 
+  };
+  processingComplete: boolean;
+}
+
+interface StatusState {
+  status: 'idle' | 'sending' | 'success' | 'error';
+  message?: string;
+}
+
+interface LocationMarkerProps {
+  onLocationSelect: (lat: number, lng: number) => void;
+  searchPosition: { lat: number; lng: number } | null;
+  initialSearchProcessed: boolean;
+  searchCounter: number; // Thêm prop mới
+}
+
+interface MapCenterControlProps {
+  goToCoords: { lat: number; lng: number } | null;
+  initialSearch: boolean;
+  setInitialSearchProcessed: (value: boolean) => void;
+  searchCounter: number; // Thêm prop mới
+}
+
+interface SatelliteMapComponentProps {
+  goToCoords?: { lat: number; lng: number } | null;
+}
 
 // Custom icon configuration
 const customIcon = L.icon({
@@ -32,59 +72,50 @@ function calculateSquareBounds(latLng: L.LatLng): L.LatLngBounds {
 }
 
 // Component to move map when new coordinates are provided
-function MapCenterControl({ goToCoords }: { goToCoords: { lat: number; lng: number } | null }) {
+function MapCenterControl({ goToCoords, initialSearch, setInitialSearchProcessed, searchCounter }: MapCenterControlProps) {
   const map = useMap();
   
   useEffect(() => {
-    if (goToCoords) {
+    if (goToCoords && initialSearch) {
       map.flyTo([goToCoords.lat, goToCoords.lng], 15, {
         duration: 1.5 // Animation duration (seconds)
       });
+      // Đánh dấu đã xử lý tọa độ tìm kiếm ban đầu
+      setInitialSearchProcessed(true);
     }
-  }, [map, goToCoords]);
+  }, [map, goToCoords, initialSearch, setInitialSearchProcessed, searchCounter]);
   
   return null;
 }
 
 function LocationMarker({ 
   onLocationSelect, 
-  onSendCoordinates,
-  searchPosition
-}: { 
-  onLocationSelect: (lat: number, lng: number) => void;
-  onSendCoordinates: (lat: number, lng: number) => void;
-  searchPosition: { lat: number; lng: number } | null;
-}) {
+  searchPosition,
+  initialSearchProcessed,
+  searchCounter
+}: LocationMarkerProps) {
   const [position, setPosition] = useState<L.LatLng | null>(null);
   const [bounds, setBounds] = useState<L.LatLngBounds | null>(null);
-  const coordinatesSent = useRef<Set<string>>(new Set());
-
-  // Update position when search coordinates change
+  const [showConfirmDialog, setShowConfirmDialog] = useState<boolean>(false);
+  const [clickedPosition, setClickedPosition] = useState<L.LatLng | null>(null);
+  
+  // Update position when search coordinates change and it's the initial search
   useEffect(() => {
-    if (searchPosition) {
+    if (searchPosition && !initialSearchProcessed) {
       const newPosition = new L.LatLng(searchPosition.lat, searchPosition.lng);
       setPosition(newPosition);
       onLocationSelect(searchPosition.lat, searchPosition.lng);
-      
-      // Create unique key for coordinates (with limited precision)
-      const posKey = `${searchPosition.lat.toFixed(6)},${searchPosition.lng.toFixed(6)}`;
-      
-      // Only send API if we haven't sent these coordinates before
-      if (!coordinatesSent.current.has(posKey)) {
-        onSendCoordinates(searchPosition.lat, searchPosition.lng);
-        coordinatesSent.current.add(posKey);
-      }
       
       // Calculate bounds for square
       const newBounds = calculateSquareBounds(newPosition);
       setBounds(newBounds);
     }
-  }, [searchPosition, onLocationSelect, onSendCoordinates]);
+  }, [searchPosition, onLocationSelect, initialSearchProcessed, searchCounter]);
 
   const map = useMapEvents({
     click(e) {
       const target = e.originalEvent.target as HTMLElement;
-      if (target.closest('.leaflet-control')) {
+      if (target.closest('.leaflet-control') || target.closest('.confirm-landslide-dialog')) {
         return;
       }
       
@@ -92,47 +123,98 @@ function LocationMarker({
       setBounds(calculateSquareBounds(e.latlng));
       onLocationSelect(e.latlng.lat, e.latlng.lng);
       
-      // Create unique key for clicked coordinates
-      const posKey = `${e.latlng.lat.toFixed(6)},${e.latlng.lng.toFixed(6)}`;
-      
-      // Only send API if we haven't sent these coordinates before
-      if (!coordinatesSent.current.has(posKey)) {
-        onSendCoordinates(e.latlng.lat, e.latlng.lng);
-        coordinatesSent.current.add(posKey);
-      }
+      // Lưu vị trí đã nhấp và hiển thị hộp thoại xác nhận
+      setClickedPosition(e.latlng);
+      setShowConfirmDialog(true);
     },
   });
 
-  return position === null ? null : (
+  return (
     <>
-      <Marker position={position} icon={customIcon}>
-        <Popup>
-          <div>
-            <h3 className="font-medium">Selected Location</h3>
-            <p className="text-sm">Longitude: {position.lng.toFixed(6)}</p>
-            <p className="text-sm">Latitude: {position.lat.toFixed(6)}</p>
-            <p className="text-sm text-gray-500 mt-2">Coordinates sent to server</p>
+      {position === null ? null : (
+        <>
+          <Marker position={position} icon={customIcon}>
+            <Popup>
+              <div>
+                <h3 className="font-medium">Vị trí đã chọn</h3>
+                <p className="text-sm">Kinh độ: {position.lng.toFixed(6)}</p>
+                <p className="text-sm">Vĩ độ: {position.lat.toFixed(6)}</p>
+              </div>
+            </Popup>
+          </Marker>
+          {bounds && (
+            <Rectangle 
+              bounds={bounds}
+              pathOptions={{
+                color: '#0c4cb3',
+                fillColor: '#3b82f6',
+                fillOpacity: 0.3,
+                weight: 2
+              }}
+            >
+              <Popup>
+                <div>
+                  <h3 className="font-medium">Vùng phân tích</h3>
+                  <p className="text-sm">Kích thước: 5km × 5km</p>
+                  <p className="text-sm">Phạm vi kiểm tra lở đất</p>
+                </div>
+              </Popup>
+            </Rectangle>
+          )}
+        </>
+      )}
+      
+      {/* Hộp thoại xác nhận */}
+      {showConfirmDialog && clickedPosition && (
+        <div className="confirm-landslide-dialog absolute top-16 right-4 bg-white p-4 rounded-lg shadow-lg z-[9999] max-w-sm">
+          <h3 className="font-bold text-lg mb-2">Phát hiện sạt lở đất</h3>
+          <p className="text-sm mb-3">Phân tích khu vực này để tìm kiếm sạt lở đất?</p>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">Chọn mốc thời gian:</label>
+            <input 
+              type="date" 
+              id="event-date" 
+              className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
+              defaultValue={new Date().toISOString().split('T')[0]} 
+            />
           </div>
-        </Popup>
-      </Marker>
-      {bounds && (
-        <Rectangle 
-          bounds={bounds}
-          pathOptions={{
-            color: '#0c4cb3',
-            fillColor: '#3b82f6',
-            fillOpacity: 0.3,
-            weight: 2
-          }}
-        >
-          <Popup>
-            <div>
-              <h3 className="font-medium">Analysis Area</h3>
-              <p className="text-sm">Size: 5km × 5km</p>
-              <p className="text-sm">Landslide detection zone</p>
-            </div>
-          </Popup>
-        </Rectangle>
+          
+          <div className="text-sm mb-3">
+            <p>Kinh độ: {clickedPosition.lng.toFixed(6)}</p>
+            <p>Vĩ độ: {clickedPosition.lat.toFixed(6)}</p>
+          </div>
+          
+          <div className="flex justify-between">
+            <button 
+              className="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded"
+              onClick={() => setShowConfirmDialog(false)}
+            >
+              Hủy
+            </button>
+            <button 
+              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded"
+              onClick={() => {
+                // Lấy giá trị ngày từ input
+                const dateInput = document.getElementById('event-date') as HTMLInputElement;
+                const eventDate = dateInput?.value || new Date().toISOString().split('T')[0];
+                
+                // Gọi hàm gửi dữ liệu (không gửi ID nữa)
+                window.dispatchEvent(new CustomEvent('send-landslide-data', {
+                  detail: {
+                    lat: clickedPosition.lat,
+                    lng: clickedPosition.lng,
+                    eventDate: eventDate
+                  }
+                }));
+                
+                setShowConfirmDialog(false);
+              }}
+            >
+              Phân tích
+            </button>
+          </div>
+        </div>
       )}
     </>
   );
@@ -140,22 +222,19 @@ function LocationMarker({
 
 export default function SatelliteMapComponent({ 
   goToCoords = null 
-}: { 
-  goToCoords?: { lat: number; lng: number } | null 
-}) {
+}: SatelliteMapComponentProps) {
   const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [sendStatus, setSendStatus] = useState<{
-    status: 'idle' | 'sending' | 'success' | 'error';
-    message?: string;
-  }>({ status: 'idle' });
-  const [landslideResults, setLandslideResults] = useState<{
-    id: string;
-    status: string;
-    landslideDetected?: boolean;
-    coordinates?: any;
-    processingComplete: boolean;
-  } | null>(null);
+  const [sendStatus, setSendStatus] = useState<StatusState>({ status: 'idle' });
+  const [landslideResults, setLandslideResults] = useState<LandslideResult | null>(null);
+  
+  // Thêm state để theo dõi chế độ xem
+  const [viewMode, setViewMode] = useState<'normal' | 'landslide'>('normal');
+  
+  // Thêm state để theo dõi xem đã xử lý tọa độ tìm kiếm ban đầu chưa
+  const [initialSearchProcessed, setInitialSearchProcessed] = useState<boolean>(false);
+  // Thêm một state mới để theo dõi lần tìm kiếm mới
+  const [searchCounter, setSearchCounter] = useState<number>(0);
   
   // Track active polling processes
   const currentPollingId = useRef<string | null>(null);
@@ -167,15 +246,25 @@ export default function SatelliteMapComponent({
     L.Marker.prototype.options.icon = customIcon;
   }, []);
 
+  // Thêm một useEffect hook mới để phát hiện khi goToCoords thay đổi
+  useEffect(() => {
+    if (goToCoords) {
+      // Đặt lại trạng thái initialSearchProcessed về false khi có tọa độ tìm kiếm mới
+      setInitialSearchProcessed(false);
+      // Tăng bộ đếm tìm kiếm để kích hoạt các effect khác
+      setSearchCounter(prev => prev + 1);
+    }
+  }, [goToCoords]);
+
   const handleLocationSelect = useCallback((lat: number, lng: number) => {
-    console.log('Location selected:', { lat, lng });
+    console.log('Vị trí đã chọn:', { lat, lng });
   }, []);
   
-  // Status polling function with improved request handling
-  const startPollingStatus = useCallback((landslideId: string) => {
+// Status polling function with improved request handling
+const startPollingStatus = useCallback((landslideId: string) => {
     // Prevent duplicate polling - check if already polling this ID
     if (currentPollingId.current === landslideId) {
-      console.log(`Already polling for landslide ID: ${landslideId}`);
+      console.log(`Đã đang theo dõi trạng thái cho ID: ${landslideId}`);
       return;
     }
     
@@ -193,7 +282,7 @@ export default function SatelliteMapComponent({
     const maxPolls = 40;
     let isPolling = true;
     
-    console.log(`Starting to poll for landslide ID: ${landslideId}`);
+    console.log(`Bắt đầu theo dõi trạng thái cho ID: ${landslideId}`);
     
     // Create interval for polling
     const intervalId = setInterval(async () => {
@@ -208,7 +297,7 @@ export default function SatelliteMapComponent({
         // Use Next.js API proxy
         const statusUrl = `/api/landslide?id=${landslideId}`;
         
-        console.log(`Checking status (${pollCount}/${maxPolls}) for ID: ${landslideId}`);
+        console.log(`Kiểm tra trạng thái (${pollCount}/${maxPolls}) cho ID: ${landslideId}`);
         
         const response = await fetch(statusUrl, {
           method: 'GET',
@@ -219,40 +308,71 @@ export default function SatelliteMapComponent({
         
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('Error response:', errorText.substring(0, 500) + '...');
-          throw new Error(`HTTP error when checking status: ${response.status}`);
+          console.error('Lỗi phản hồi:', errorText.substring(0, 500) + '...');
+          throw new Error(`Lỗi HTTP khi kiểm tra trạng thái: ${response.status}`);
         }
         
         // Process JSON response
         const statusData = await response.json();
-        console.log('Status data:', statusData);
+        console.log('Dữ liệu trạng thái:', statusData);
         
-        // Check if we have complete landslide detection data
-        const hasCompleteLandslideData = 
-          statusData.status === 'success' && 
-          statusData.landslide_detected !== null && 
-          statusData.landslide_coordinates !== null;
-        
-        // Update state with latest results
-        if (statusData && typeof statusData === 'object') {
+        // CRITICAL CHECK: Stop immediately if we see success status
+        if (statusData && statusData.status === 'success') {
+          console.log('ĐÃ NHẬN ĐƯỢC TRẠNG THÁI THÀNH CÔNG - DỪNG NGAY LẬP TỨC');
+          
+          // Update state with results
           setLandslideResults({
             id: landslideId,
-            status: statusData.status || 'unknown',
+            status: 'success',
             landslideDetected: statusData.landslide_detected === true,
-            coordinates: statusData.landslide_coordinates || null,
-            processingComplete: hasCompleteLandslideData || statusData.status === 'error'
+            landslide_coordinates: statusData.landslide_coordinates || null,
+            processingComplete: true
           });
           
-          // Stop polling if we have complete data or there's an error
-          if (hasCompleteLandslideData || statusData.status === 'error') {
-            console.log('Processing complete with full data:', statusData);
+          // Display success notification
+          setSendStatus({
+            status: 'success',
+            message: `Xử lý hoàn tất: ${statusData.landslide_detected ? 'Phát hiện lở đất!' : 'Không phát hiện lở đất.'}`
+          });
+          
+          // Switch to landslide view if needed
+          if (statusData.landslide_detected && statusData.landslide_coordinates) {
+            setViewMode('landslide');
+          }
+          
+          // Clean up - using multiple approaches to ensure it stops
+          isPolling = false;
+          currentPollingId.current = null;
+          clearInterval(intervalId);
+          pollingCleanupFunction.current = null;
+          
+          // Auto-hide notification
+          setTimeout(() => {
+            setSendStatus({ status: 'idle' });
+          }, 10000);
+          
+          return; // Exit immediately
+        }
+        
+        // For all other cases, continue with normal processing
+        if (statusData && typeof statusData === 'object') {
+          
+          // Check for error status
+          if (statusData.status === 'error') {
+            console.log('Đã nhận được trạng thái lỗi, dừng kiểm tra');
             
-            // Display result notification
+            // Update state with error results
+            setLandslideResults({
+              id: landslideId,
+              status: 'error',
+              landslideDetected: false, 
+              processingComplete: true
+            });
+            
+            // Display error notification
             setSendStatus({
-              status: statusData.status === 'success' ? 'success' : 'error',
-              message: statusData.status === 'success' 
-                ? `Processing complete: ${statusData.landslide_detected ? 'Landslide detected!' : 'No landslide detected.'}`
-                : `Error processing: ${statusData.message || 'Unknown error'}`
+              status: 'error',
+              message: `Lỗi xử lý: ${statusData.message || 'Lỗi không xác định'}`
             });
             
             // Clean up
@@ -260,22 +380,33 @@ export default function SatelliteMapComponent({
             currentPollingId.current = null;
             clearInterval(intervalId);
             
-            // Auto-hide notification after 10 seconds
+            // Auto-hide notification
             setTimeout(() => {
               setSendStatus({ status: 'idle' });
             }, 10000);
+            
+            return; // Exit early
           }
+          
+          // If we're still processing, update state without stopping poll
+          setLandslideResults({
+            id: landslideId,
+            status: statusData.status || 'unknown',
+            landslideDetected: statusData.landslide_detected === true,
+            landslide_coordinates: statusData.landslide_coordinates || null,
+            processingComplete: false
+          });
         } else {
-          throw new Error('Invalid response data');
+          throw new Error('Dữ liệu phản hồi không hợp lệ');
         }
         
         // Stop if we've reached max poll count
         if (pollCount >= maxPolls) {
-          console.log('Reached maximum polling attempts');
+          console.log('Đã đạt đến số lần thử tối đa');
           
           setSendStatus({
             status: 'error',
-            message: 'Processing timeout. Please check again later.'
+            message: 'Quá thời gian xử lý. Vui lòng kiểm tra lại sau.'
           });
           
           // Clean up
@@ -288,13 +419,13 @@ export default function SatelliteMapComponent({
           }, 5000);
         }
       } catch (error) {
-        console.error('Error checking landslide status:', error);
+        console.error('Lỗi kiểm tra trạng thái lở đất:', error);
         
         // Stop polling after several consecutive errors
         if (pollCount >= 5) {
           setSendStatus({
             status: 'error',
-            message: error instanceof Error ? error.message : 'Error checking status'
+            message: error instanceof Error ? error.message : 'Lỗi kiểm tra trạng thái'
           });
           
           // Clean up
@@ -315,10 +446,16 @@ export default function SatelliteMapComponent({
       currentPollingId.current = null;
       clearInterval(intervalId);
     };
-  }, []);
 
+    // Return the cleanup function in case we need to clean up manually
+    return () => {
+      if (pollingCleanupFunction.current) {
+        pollingCleanupFunction.current();
+      }
+    };
+  }, []);
   // Send coordinates to API endpoint using Next.js API route
-  const sendCoordinates = async (lat: number, lng: number) => {
+  const sendCoordinates = async (lat: number, lng: number, eventDate: string) => {
     try {
       setSendStatus({ status: 'sending' });
       
@@ -326,16 +463,16 @@ export default function SatelliteMapComponent({
       const payload = {
         X: lng,  // Longitude - GEE expects this first
         Y: lat,  // Latitude
-        event_date: new Date().toISOString().split('T')[0], // Format: YYYY-MM-DD
+        event_date: eventDate,
         api_key: process.env.NEXT_PUBLIC_API_KEY || "10102003" // Add API key from environment variable
       };
       
-      console.log('Sending to API:', payload);
+      console.log('Gửi đến API:', payload);
       
       // Use Next.js API proxy instead of calling ngrok directly
       const apiUrl = '/api/landslide';
       
-      console.log('API URL:', apiUrl);
+      console.log('URL API:', apiUrl);
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -346,48 +483,48 @@ export default function SatelliteMapComponent({
       });
   
       // Log status code and headers for debugging
-      console.log('Response status code:', response.status);
-      console.log('Response headers:', Object.fromEntries([...response.headers]));
+      console.log('Mã trạng thái phản hồi:', response.status);
+      console.log('Headers phản hồi:', Object.fromEntries([...response.headers]));
   
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Error response:', errorText.substring(0, 500));
-        throw new Error(`HTTP Error! Status code: ${response.status}`);
+        console.error('Phản hồi lỗi:', errorText.substring(0, 500));
+        throw new Error(`Lỗi HTTP! Mã trạng thái: ${response.status}`);
       }
   
       // Process JSON response
       const data = await response.json();
-      console.log('Coordinates sent successfully:', data);
+      console.log('Tọa độ đã được gửi thành công:', data);
       
       // Save ID to state for tracking results
-      const landslideId = data.id;
-      if (!landslideId) {
-        throw new Error('No landslide ID in response');
+      const responseId = data.id;
+      if (!responseId) {
+        throw new Error('Không có ID lở đất trong phản hồi');
       }
       
       setLandslideResults({
-        id: landslideId,
+        id: responseId,
         status: 'processing',
         processingComplete: false
       });
       
       setSendStatus({ 
         status: 'success', 
-        message: 'Coordinates sent successfully! ID: ' + landslideId 
+        message: 'Tọa độ đã được gửi thành công! ID: ' + responseId 
       });
       
       // Start tracking processing status
-      startPollingStatus(landslideId);
+      startPollingStatus(responseId);
       
       // Notification will automatically disappear after status tracking begins
       setTimeout(() => {
         setSendStatus({ status: 'idle' });
       }, 5000);
     } catch (error) {
-      console.error('Error sending coordinates:', error);
+      console.error('Lỗi gửi tọa độ:', error);
       setSendStatus({ 
         status: 'error', 
-        message: error instanceof Error ? error.message : 'Error sending coordinates' 
+        message: error instanceof Error ? error.message : 'Lỗi gửi tọa độ' 
       });
     }
   };
@@ -402,23 +539,32 @@ export default function SatelliteMapComponent({
           setLoading(false);
         },
         (error) => {
-          console.error('Error getting location:', error);
+          console.error('Lỗi lấy vị trí:', error);
           // Fallback to Vietnam coordinates
           setCurrentLocation([21.0285, 105.8542]);
           setLoading(false);
         }
       );
     } else {
-      console.error('Browser does not support geolocation');
+      console.error('Trình duyệt không hỗ trợ geolocation');
       // Fallback to Vietnam coordinates
       setCurrentLocation([21.0285, 105.8542]);
       setLoading(false);
     }
   }, []);
 
-  // Clean up polling when component unmounts
+  // Bắt sự kiện từ custom event để gửi dữ liệu
   useEffect(() => {
+    const handleSendLandslideData = (event: CustomEvent) => {
+      const { lat, lng, eventDate } = event.detail;
+      sendCoordinates(lat, lng, eventDate);
+    };
+
+    window.addEventListener('send-landslide-data', handleSendLandslideData as EventListener);
+
     return () => {
+      window.removeEventListener('send-landslide-data', handleSendLandslideData as EventListener);
+      
       if (pollingCleanupFunction.current) {
         pollingCleanupFunction.current();
       }
@@ -445,19 +591,48 @@ export default function SatelliteMapComponent({
         
         {currentLocation && (
           <Marker position={currentLocation} icon={customIcon}>
-            <Popup>Your location</Popup>
+            <Popup>Vị trí của bạn</Popup>
           </Marker>
         )}
 
-        <LocationMarker 
-          onLocationSelect={handleLocationSelect} 
-          onSendCoordinates={sendCoordinates}
-          searchPosition={goToCoords}
-        />
+        {viewMode === 'normal' && (
+          <LocationMarker 
+            onLocationSelect={handleLocationSelect} 
+            searchPosition={goToCoords}
+            initialSearchProcessed={initialSearchProcessed}
+            searchCounter={searchCounter}
+          />
+        )}
+        
+        {/* Hiển thị các điểm lở đất nếu ở chế độ xem lở đất và có kết quả phân tích */}
+        {viewMode === 'landslide' && landslideResults?.landslideDetected && landslideResults.landslide_coordinates?.coordinates && (
+          <LandslideMarkerLayer coordinates={landslideResults.landslide_coordinates.coordinates} autoFitBounds={true} />
+        )}
         
         {/* Map center control component */}
-        <MapCenterControl goToCoords={goToCoords} />
+        <MapCenterControl 
+          goToCoords={goToCoords} 
+          initialSearch={!initialSearchProcessed} 
+          setInitialSearchProcessed={setInitialSearchProcessed}
+          searchCounter={searchCounter}
+        />
       </MapContainer>
+
+      {/* Nút chuyển đổi chế độ xem */}
+      {landslideResults?.landslideDetected && landslideResults.landslide_coordinates?.coordinates && (
+        <div className="absolute top-4 left-4 z-[1000]">
+          <button 
+            className={`px-3 py-2 rounded-lg shadow-lg ${
+              viewMode === 'normal' 
+                ? 'bg-blue-500 text-white' 
+                : 'bg-white text-blue-500'
+            }`}
+            onClick={() => setViewMode(viewMode === 'normal' ? 'landslide' : 'normal')}
+          >
+            {viewMode === 'normal' ? 'Xem điểm lở đất' : 'Chế độ thường'}
+          </button>
+        </div>
+      )}
 
       {/* Status notification */}
       {sendStatus.status !== 'idle' && (
@@ -466,16 +641,16 @@ export default function SatelliteMapComponent({
           sendStatus.status === 'success' ? 'bg-green-100 text-green-800' :
           'bg-red-100 text-red-800'
         }`}>
-          {sendStatus.status === 'sending' && 'Sending coordinates...'}
+          {sendStatus.status === 'sending' && 'Đang gửi tọa độ...'}
           {sendStatus.status === 'success' && sendStatus.message}
-          {sendStatus.status === 'error' && `Error: ${sendStatus.message}`}
+          {sendStatus.status === 'error' && `Lỗi: ${sendStatus.message}`}
         </div>
       )}
       
       {/* Landslide analysis results */}
       {landslideResults && landslideResults.processingComplete && (
         <div className="absolute top-4 right-4 p-4 bg-white rounded-lg shadow-lg z-[9999] max-w-xs">
-          <h3 className="font-bold text-lg">Analysis Results</h3>
+          <h3 className="font-bold text-lg">Kết quả phân tích</h3>
           <p className="text-sm mb-2">ID: {landslideResults.id}</p>
           
           {landslideResults.status === 'success' ? (
@@ -486,30 +661,63 @@ export default function SatelliteMapComponent({
                   : 'bg-green-100 text-green-800'
               }`}>
                 {landslideResults.landslideDetected 
-                  ? '⚠️ Landslide detected!' 
-                  : '✅ No landslide detected.'}
+                  ? '⚠️ Phát hiện lở đất!' 
+                  : '✅ Không phát hiện lở đất.'}
               </div>
               
-              {landslideResults.landslideDetected && landslideResults.coordinates && (
-                <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
-                  <p className="font-medium">Landslide coordinates:</p>
-                  <pre className="overflow-x-auto">
-                    {JSON.stringify(landslideResults.coordinates, null, 2)}
-                  </pre>
+              {landslideResults.landslideDetected && landslideResults.landslide_coordinates?.coordinates && (
+                <div className="mt-2">
+                  <p className="font-medium text-sm">Đã phát hiện {landslideResults.landslide_coordinates.coordinates.length} điểm lở đất</p>
+                  
+                  <button 
+                    className="mt-2 w-full py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm"
+                    onClick={() => setViewMode('landslide')}
+                  >
+                    Xem trên bản đồ
+                  </button>
+                  
+                  <div className="mt-2 p-2 bg-gray-50 rounded text-xs max-h-40 overflow-y-auto">
+                    <p className="font-medium mb-1">Chi tiết tọa độ:</p>
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="p-1 border text-left">ID</th>
+                          <th className="p-1 border text-right">Đông</th>
+                          <th className="p-1 border text-right">Bắc</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {landslideResults.landslide_coordinates.coordinates.slice(0, 5).map((coord: LandslideCoordinate, idx: number) => (
+                          <tr key={coord.segment_id || idx}>
+                            <td className="p-1 border">{coord.segment_id}</td>
+                            <td className="p-1 border text-right">{parseFloat(coord.east.toString()).toFixed(1)}</td>
+                            <td className="p-1 border text-right">{parseFloat(coord.north.toString()).toFixed(1)}</td>
+                          </tr>
+                        ))}
+                        {landslideResults.landslide_coordinates.coordinates.length > 5 && (
+                          <tr>
+                            <td colSpan={3} className="p-1 text-center italic">
+                              ...và {landslideResults.landslide_coordinates.coordinates.length - 5} điểm khác
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </>
           ) : (
             <div className="p-2 bg-red-100 text-red-800 rounded">
-              Processing failed. Please try again.
+              Xử lý thất bại. Vui lòng thử lại.
             </div>
           )}
           
           <button 
-            className="mt-2 w-full py-1 px-3 bg-gray-200 hover:bg-gray-300 rounded text-sm"
+            className="mt-3 w-full py-1 px-3 bg-gray-200 hover:bg-gray-300 rounded text-sm"
             onClick={() => setLandslideResults(null)}
           >
-            Close
+            Đóng
           </button>
         </div>
       )}
