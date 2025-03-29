@@ -1,143 +1,16 @@
-// app/dashboard/Map/components/MapComponent.tsx
+// app/dashboard/Map/components/GoogleMapComponent.tsx
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Rectangle, useMapEvents, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { APIProvider, Map, AdvancedMarker, Pin, useMap } from '@vis.gl/react-google-maps';
 
-// Custom icon configuration
-const customIcon = L.icon({
-  iconUrl: '/images/marker-icon.png',
-  iconRetinaUrl: '/images/marker-icon-2x.png',
-  shadowUrl: '/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-// Hàm tính toán hình vuông 5000x5000m xung quanh điểm
-function calculateSquareBounds(latLng: L.LatLng): L.LatLngBounds {
-  // Độ dài 2500m tính theo độ (xấp xỉ)
-  // 1 độ vĩ độ ≈ 111.32 km ở xích đạo
-  // 1 độ kinh độ ≈ 111.32 * cos(latitude) km
-  const latOffset = 2500 / 111320; // độ dài 2500m theo độ vĩ độ
-  const longOffset = 2500 / (111320 * Math.cos(latLng.lat * Math.PI / 180)); // độ dài 2500m theo độ kinh độ
-
-  const northEast = L.latLng(latLng.lat + latOffset, latLng.lng + longOffset);
-  const southWest = L.latLng(latLng.lat - latOffset, latLng.lng - longOffset);
-
-  return L.latLngBounds(southWest, northEast);
+interface GoogleMapComponentProps {
+  apiKey?: string;
 }
 
-// Component để di chuyển bản đồ khi có tọa độ mới
-function MapCenterControl({ goToCoords }: { goToCoords: { lat: number; lng: number } | null }) {
-  const map = useMap();
-  
-  useEffect(() => {
-    if (goToCoords) {
-      map.flyTo([goToCoords.lat, goToCoords.lng], 15, {
-        duration: 1.5 // Thời gian di chuyển (giây)
-      });
-    }
-  }, [map, goToCoords]);
-  
-  return null;
-}
-
-function LocationMarker({ 
-  onLocationSelect, 
-  onSendCoordinates,
-  searchPosition
-}: { 
-  onLocationSelect: (lat: number, lng: number) => void;
-  onSendCoordinates: (lat: number, lng: number) => void;
-  searchPosition: { lat: number; lng: number } | null;
-}) {
-  const [position, setPosition] = useState<L.LatLng | null>(null);
-  const [bounds, setBounds] = useState<L.LatLngBounds | null>(null);
-  const alreadySent = useRef<{[key: string]: boolean}>({});
-
-  // Cập nhật vị trí khi có tọa độ tìm kiếm mới
-  useEffect(() => {
-    if (searchPosition) {
-      const newPosition = new L.LatLng(searchPosition.lat, searchPosition.lng);
-      setPosition(newPosition);
-      onLocationSelect(searchPosition.lat, searchPosition.lng);
-      
-      // Tạo khóa duy nhất cho tọa độ
-      const posKey = `${searchPosition.lat.toFixed(6)},${searchPosition.lng.toFixed(6)}`;
-      
-      // Chỉ gửi API nếu chưa gửi cho tọa độ này trước đó
-      if (!alreadySent.current[posKey]) {
-        onSendCoordinates(searchPosition.lat, searchPosition.lng);
-        alreadySent.current[posKey] = true;
-      }
-      
-      // Tính toán bounds cho hình vuông
-      const newBounds = calculateSquareBounds(newPosition);
-      setBounds(newBounds);
-    }
-  }, [searchPosition, onLocationSelect, onSendCoordinates]);
-
-  const map = useMapEvents({
-    click(e) {
-      const target = e.originalEvent.target as HTMLElement;
-      if (target.closest('.leaflet-control')) {
-        return;
-      }
-      
-      setPosition(e.latlng);
-      setBounds(calculateSquareBounds(e.latlng));
-      onLocationSelect(e.latlng.lat, e.latlng.lng);
-      
-      // Gửi tọa độ lên server
-      onSendCoordinates(e.latlng.lat, e.latlng.lng);
-    },
-  });
-
-  return position === null ? null : (
-    <>
-      <Marker position={position} icon={customIcon}>
-        <Popup>
-          <div>
-            <h3 className="font-medium">Vị trí đã chọn</h3>
-            <p className="text-sm">Kinh độ: {position.lng.toFixed(6)}</p>
-            <p className="text-sm">Vĩ độ: {position.lat.toFixed(6)}</p>
-            <p className="text-sm text-gray-500 mt-2">Tọa độ đã được gửi lên server</p>
-          </div>
-        </Popup>
-      </Marker>
-      {bounds && (
-        <Rectangle 
-          bounds={bounds}
-          pathOptions={{
-            color: '#0c4cb3',
-            fillColor: '#3b82f6',
-            fillOpacity: 0.3,
-            weight: 2
-          }}
-        >
-          <Popup>
-            <div>
-              <h3 className="font-medium">Vùng phân tích</h3>
-              <p className="text-sm">Kích thước: 5km × 5km</p>
-              <p className="text-sm">Phạm vi kiểm tra lở đất</p>
-            </div>
-          </Popup>
-        </Rectangle>
-      )}
-    </>
-  );
-}
-
-export default function MapComponent({ 
-  goToCoords = null 
-}: { 
-  goToCoords?: { lat: number; lng: number } | null 
-}) {
-  const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null);
+export default function GoogleMapComponent({ apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '' }: GoogleMapComponentProps) {
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [sendStatus, setSendStatus] = useState<{
     status: 'idle' | 'sending' | 'success' | 'error';
@@ -151,16 +24,30 @@ export default function MapComponent({
     processingComplete: boolean;
   } | null>(null);
 
-  // Fix cho Leaflet icons trong Next.js
+  // Lấy vị trí hiện tại
   useEffect(() => {
-    // Sử dụng cách khác để cài đặt icon mặc định
-    L.Marker.prototype.options.icon = customIcon;
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setCurrentLocation({ lat: latitude, lng: longitude });
+          setLoading(false);
+        },
+        (error) => {
+          console.error('Lỗi khi lấy vị trí:', error);
+          // Fallback to Vietnam coordinates
+          setCurrentLocation({ lat: 21.0285, lng: 105.8542 });
+          setLoading(false);
+        }
+      );
+    } else {
+      console.error('Trình duyệt không hỗ trợ geolocation');
+      // Fallback to Vietnam coordinates
+      setCurrentLocation({ lat: 21.0285, lng: 105.8542 });
+      setLoading(false);
+    }
   }, []);
 
-  const handleLocationSelect = useCallback((lat: number, lng: number) => {
-    console.log('Vị trí được chọn:', { lat, lng });
-  }, []);
-  
   // Hàm theo dõi trạng thái xử lý từ server
   const startPollingStatus = useCallback((landslideId: string) => {
     // Tạo biến để theo dõi số lần kiểm tra
@@ -183,8 +70,6 @@ export default function MapComponent({
           }
         });
         
-        console.log(response);
-
         if (!response.ok) {
           throw new Error(`HTTP error when checking status: ${response.status}`);
         }
@@ -272,7 +157,7 @@ export default function MapComponent({
       console.log('Sending to API:', payload);
       
       // Sử dụng biến môi trường từ Next.js hoặc Ngrok URL từ file .env.local
-      const apiUrl = process.env.NEXT_PUBLIC_COORDINATES_SERVER_URL || 'https://f6c3-27-72-102-101.ngrok-free.app/api/landslide';
+      const apiUrl = process.env.NEXT_PUBLIC_COORDINATES_SERVER_URL ;
       
       console.log('API URL:', apiUrl);
       
@@ -321,61 +206,70 @@ export default function MapComponent({
     }
   };
 
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          setCurrentLocation([latitude, longitude]);
-          setLoading(false);
-        },
-        (error) => {
-          console.error('Lỗi khi lấy vị trí:', error);
-          // Fallback to Vietnam coordinates
-          setCurrentLocation([21.0285, 105.8542]);
-          setLoading(false);
-        }
-      );
-    } else {
-      console.error('Trình duyệt không hỗ trợ geolocation');
-      // Fallback to Vietnam coordinates
-      setCurrentLocation([21.0285, 105.8542]);
-      setLoading(false);
-    }
-  }, []);
-
   if (loading) {
     return <div className="w-full h-full bg-gray-100 animate-pulse" />;
   }
 
+  // Component cho marker và xử lý sự kiện
+  const MapContent = () => {
+    const map = useMap();
+    
+    const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+      if (!e.latLng) return;
+      
+      const lat = e.latLng.lat();
+      const lng = e.latLng.lng();
+      
+      setSelectedLocation({ lat, lng });
+      console.log('Vị trí được chọn:', { lat, lng });
+      
+      // Gửi tọa độ lên server
+      sendCoordinates(lat, lng);
+    }, []);
+    
+    useEffect(() => {
+      if (!map) return;
+      
+      // Đăng ký sự kiện click trên map
+      const clickListener = map.addListener('click', handleMapClick);
+      
+      // Cleanup listener khi component unmount
+      return () => {
+        google.maps.event.removeListener(clickListener);
+      };
+    }, [map, handleMapClick]);
+    
+    return (
+      <>
+        {currentLocation && (
+          <AdvancedMarker position={currentLocation} title="Vị trí của bạn">
+            <Pin background={'#4285F4'} glyphColor={'#FFF'} borderColor={'#4285F4'} />
+          </AdvancedMarker>
+        )}
+        
+        {selectedLocation && (
+          <AdvancedMarker position={selectedLocation} title="Vị trí đã chọn">
+            <Pin background={'#FBBC04'} glyphColor={'#000'} borderColor={'#000'} />
+          </AdvancedMarker>
+        )}
+      </>
+    );
+  };
+
   return (
     <div className="relative w-full h-full">
-      <MapContainer
-        center={currentLocation || [21.0285, 105.8542]}
-        zoom={13}
-        scrollWheelZoom={true}
-        className="w-full h-full"
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        
-        {currentLocation && (
-          <Marker position={currentLocation} icon={customIcon}>
-            <Popup>Vị trí của bạn</Popup>
-          </Marker>
-        )}
-
-        <LocationMarker 
-          onLocationSelect={handleLocationSelect} 
-          onSendCoordinates={sendCoordinates}
-          searchPosition={goToCoords}
-        />
-        
-        {/* Component điều khiển tọa độ trung tâm bản đồ */}
-        <MapCenterControl goToCoords={goToCoords} />
-      </MapContainer>
+      <APIProvider apiKey={apiKey} onLoad={() => console.log('Maps API đã tải xong')}>
+        <Map
+          defaultZoom={13}
+          defaultCenter={currentLocation || { lat: 21.0285, lng: 105.8542 }}
+          mapId="DEMO_MAP_ID" // Thay thế bằng map ID từ Google Cloud Console của bạn
+          gestureHandling="greedy"
+          disableDefaultUI={false}
+          mapTypeControl={true}
+        >
+          <MapContent />
+        </Map>
+      </APIProvider>
 
       {/* Thông báo trạng thái */}
       {sendStatus.status !== 'idle' && (

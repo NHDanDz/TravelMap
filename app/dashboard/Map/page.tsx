@@ -3,8 +3,8 @@
 
 import dynamic from 'next/dynamic';
  
-const MapComponent = dynamic(
-  () => import('./components/MapComponent'),
+const MapContainer = dynamic(
+  () => import('./components/MapContainer'),
   {
     loading: () => <div className="w-full h-[calc(100vh-64px)] bg-gray-100 animate-pulse" />,
     ssr: false
@@ -14,7 +14,7 @@ const MapComponent = dynamic(
 export default function MapPage() {
   return (
     <div className="w-full h-[calc(100vh-64px)]">
-      <MapComponent />
+      <MapContainer/>
     </div>
   );
 }
