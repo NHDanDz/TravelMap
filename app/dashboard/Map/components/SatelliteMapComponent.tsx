@@ -20,7 +20,7 @@ interface LandslideResult {
   landslide_coordinates?: { 
     coordinates: LandslideCoordinate[] 
   };
-  processingComplete: boolean;
+  model_processing_completed?: boolean; // Đã sửa từ processingComplete
 }
 
 interface StatusState {
@@ -32,14 +32,15 @@ interface LocationMarkerProps {
   onLocationSelect: (lat: number, lng: number) => void;
   searchPosition: { lat: number; lng: number } | null;
   initialSearchProcessed: boolean;
-  searchCounter: number; // Thêm prop mới
+  searchCounter: number;
+  viewMode: 'normal' | 'landslide';
 }
 
 interface MapCenterControlProps {
   goToCoords: { lat: number; lng: number } | null;
   initialSearch: boolean;
   setInitialSearchProcessed: (value: boolean) => void;
-  searchCounter: number; // Thêm prop mới
+  searchCounter: number;
 }
 
 interface SatelliteMapComponentProps {
@@ -92,7 +93,8 @@ function LocationMarker({
   onLocationSelect, 
   searchPosition,
   initialSearchProcessed,
-  searchCounter
+  searchCounter,
+  viewMode
 }: LocationMarkerProps) {
   const [position, setPosition] = useState<L.LatLng | null>(null);
   const [bounds, setBounds] = useState<L.LatLngBounds | null>(null);
@@ -114,6 +116,9 @@ function LocationMarker({
 
   const map = useMapEvents({
     click(e) {
+      // Chỉ xử lý click khi đang ở chế độ normal 
+      if (viewMode !== 'normal') return;
+      
       const target = e.originalEvent.target as HTMLElement;
       if (target.closest('.leaflet-control') || target.closest('.confirm-landslide-dialog')) {
         return;
@@ -128,6 +133,11 @@ function LocationMarker({
       setShowConfirmDialog(true);
     },
   });
+
+  // Nếu đang ở chế độ landslide, chỉ hiển thị marker và hình chữ nhật nếu position đã được thiết lập
+  if (viewMode === 'landslide' && position === null) {
+    return null;
+  }
 
   return (
     <>
@@ -164,8 +174,8 @@ function LocationMarker({
         </>
       )}
       
-      {/* Hộp thoại xác nhận */}
-      {showConfirmDialog && clickedPosition && (
+      {/* Hộp thoại xác nhận - chỉ hiển thị ở chế độ normal */}
+      {showConfirmDialog && clickedPosition && viewMode === 'normal' && (
         <div className="confirm-landslide-dialog absolute top-16 right-4 bg-white p-4 rounded-lg shadow-lg z-[9999] max-w-sm">
           <h3 className="font-bold text-lg mb-2">Phát hiện sạt lở đất</h3>
           <p className="text-sm mb-3">Phân tích khu vực này để tìm kiếm sạt lở đất?</p>
@@ -199,7 +209,7 @@ function LocationMarker({
                 const dateInput = document.getElementById('event-date') as HTMLInputElement;
                 const eventDate = dateInput?.value || new Date().toISOString().split('T')[0];
                 
-                // Gọi hàm gửi dữ liệu (không gửi ID nữa)
+                // Gọi hàm gửi dữ liệu
                 window.dispatchEvent(new CustomEvent('send-landslide-data', {
                   detail: {
                     lat: clickedPosition.lat,
@@ -260,8 +270,8 @@ export default function SatelliteMapComponent({
     console.log('Vị trí đã chọn:', { lat, lng });
   }, []);
   
-// Status polling function with improved request handling
-const startPollingStatus = useCallback((landslideId: string) => {
+  // Status polling function with improved request handling
+  const startPollingStatus = useCallback((landslideId: string) => {
     // Prevent duplicate polling - check if already polling this ID
     if (currentPollingId.current === landslideId) {
       console.log(`Đã đang theo dõi trạng thái cho ID: ${landslideId}`);
@@ -279,7 +289,7 @@ const startPollingStatus = useCallback((landslideId: string) => {
     
     // Tracking variables
     let pollCount = 0;
-    const maxPolls = 40;
+    const maxPolls = 100;
     let isPolling = true;
     
     console.log(`Bắt đầu theo dõi trạng thái cho ID: ${landslideId}`);
@@ -316,8 +326,8 @@ const startPollingStatus = useCallback((landslideId: string) => {
         const statusData = await response.json();
         console.log('Dữ liệu trạng thái:', statusData);
         
-        // CRITICAL CHECK: Stop immediately if we see success status
-        if (statusData && statusData.status === 'success') {
+        // CRITICAL CHECK: Stop immediately if we see success status AND model processing completed
+        if (statusData && statusData.status === 'success' && statusData.model_processing_completed === true) {
           console.log('ĐÃ NHẬN ĐƯỢC TRẠNG THÁI THÀNH CÔNG - DỪNG NGAY LẬP TỨC');
           
           // Update state with results
@@ -326,7 +336,7 @@ const startPollingStatus = useCallback((landslideId: string) => {
             status: 'success',
             landslideDetected: statusData.landslide_detected === true,
             landslide_coordinates: statusData.landslide_coordinates || null,
-            processingComplete: true
+            model_processing_completed: true
           });
           
           // Display success notification
@@ -358,7 +368,7 @@ const startPollingStatus = useCallback((landslideId: string) => {
         if (statusData && typeof statusData === 'object') {
           
           // Check for error status
-          if (statusData.status === 'error') {
+          if (statusData.status === 'error' || statusData.status === 'error_detection') {
             console.log('Đã nhận được trạng thái lỗi, dừng kiểm tra');
             
             // Update state with error results
@@ -366,7 +376,7 @@ const startPollingStatus = useCallback((landslideId: string) => {
               id: landslideId,
               status: 'error',
               landslideDetected: false, 
-              processingComplete: true
+              model_processing_completed: true
             });
             
             // Display error notification
@@ -394,7 +404,7 @@ const startPollingStatus = useCallback((landslideId: string) => {
             status: statusData.status || 'unknown',
             landslideDetected: statusData.landslide_detected === true,
             landslide_coordinates: statusData.landslide_coordinates || null,
-            processingComplete: false
+            model_processing_completed: statusData.model_processing_completed === true
           });
         } else {
           throw new Error('Dữ liệu phản hồi không hợp lệ');
@@ -454,6 +464,7 @@ const startPollingStatus = useCallback((landslideId: string) => {
       }
     };
   }, []);
+  
   // Send coordinates to API endpoint using Next.js API route
   const sendCoordinates = async (lat: number, lng: number, eventDate: string) => {
     try {
@@ -505,7 +516,7 @@ const startPollingStatus = useCallback((landslideId: string) => {
       setLandslideResults({
         id: responseId,
         status: 'processing',
-        processingComplete: false
+        model_processing_completed: false
       });
       
       setSendStatus({ 
@@ -595,20 +606,25 @@ const startPollingStatus = useCallback((landslideId: string) => {
           </Marker>
         )}
 
-        {viewMode === 'normal' && (
-          <LocationMarker 
-            onLocationSelect={handleLocationSelect} 
-            searchPosition={goToCoords}
-            initialSearchProcessed={initialSearchProcessed}
-            searchCounter={searchCounter}
-          />
-        )}
+        {/* LocationMarker hiển thị ở cả hai chế độ xem, nhưng truyền viewMode để nó có thể điều chỉnh hành vi */}
+        <LocationMarker 
+          onLocationSelect={handleLocationSelect} 
+          searchPosition={goToCoords}
+          initialSearchProcessed={initialSearchProcessed}
+          searchCounter={searchCounter}
+          viewMode={viewMode}
+        />
         
         {/* Hiển thị các điểm lở đất nếu ở chế độ xem lở đất và có kết quả phân tích */}
-        {viewMode === 'landslide' && landslideResults?.landslideDetected && landslideResults.landslide_coordinates?.coordinates && (
-          <LandslideMarkerLayer coordinates={landslideResults.landslide_coordinates.coordinates} autoFitBounds={true} />
+        {viewMode === 'landslide' && landslideResults?.landslideDetected && 
+          landslideResults.landslide_coordinates?.coordinates && (
+          <LandslideMarkerLayer 
+            coordinates={landslideResults.landslide_coordinates.coordinates} 
+            autoFitBounds={true}
+            centerLongitude={goToCoords?.lng || currentLocation?.[1] || 105.8542}
+            centerLatitude={goToCoords?.lat || currentLocation?.[0] || 21.0285}
+          />
         )}
-        
         {/* Map center control component */}
         <MapCenterControl 
           goToCoords={goToCoords} 
@@ -633,6 +649,22 @@ const startPollingStatus = useCallback((landslideId: string) => {
           </button>
         </div>
       )}
+      
+      {/* Hiển thị trạng thái chi tiết trong quá trình xử lý */}
+      {landslideResults && !landslideResults.model_processing_completed && (
+        <div className="absolute bottom-16 left-4 p-4 bg-white rounded-lg shadow-lg z-[9999]">
+          <h3 className="font-bold">Đang xử lý...</h3>
+          <p className="text-sm">
+            {landslideResults.status === 'processing' && 'Khởi tạo xử lý...'}
+            {landslideResults.status === 'processing_images' && 'Đang xử lý ảnh vệ tinh...'}
+            {landslideResults.status === 'detecting_landslides' && 'Đang phát hiện lở đất...'}
+            {landslideResults.status === 'unknown' && 'Đang xử lý...'}
+          </p>
+          <div className="mt-2 w-full bg-gray-200 rounded-full h-2.5">
+            <div className="bg-blue-600 h-2.5 rounded-full animate-pulse w-full"></div>
+          </div>
+        </div>
+      )}
 
       {/* Status notification */}
       {sendStatus.status !== 'idle' && (
@@ -648,7 +680,7 @@ const startPollingStatus = useCallback((landslideId: string) => {
       )}
       
       {/* Landslide analysis results */}
-      {landslideResults && landslideResults.processingComplete && (
+      {landslideResults && landslideResults.model_processing_completed && (
         <div className="absolute top-4 right-4 p-4 bg-white rounded-lg shadow-lg z-[9999] max-w-xs">
           <h3 className="font-bold text-lg">Kết quả phân tích</h3>
           <p className="text-sm mb-2">ID: {landslideResults.id}</p>

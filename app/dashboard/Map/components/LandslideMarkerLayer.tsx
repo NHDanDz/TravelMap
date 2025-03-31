@@ -4,6 +4,7 @@
 import { useEffect, useMemo } from 'react';
 import { LayerGroup, Circle, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import proj4 from 'proj4';
 
 // Định nghĩa kiểu dữ liệu
 interface LandslideCoordinate {
@@ -20,6 +21,8 @@ interface LandslideMarkerLayerProps {
   showCircles?: boolean;
   onMarkerClick?: (coordinate: LandslideCoordinate) => void;
   highlightedId?: string;
+  centerLongitude: number; // Kinh độ trung tâm của ảnh
+  centerLatitude: number;  // Vĩ độ trung tâm của ảnh
 }
 
 // Biểu tượng tùy chỉnh cho điểm lở đất
@@ -35,33 +38,25 @@ const createLandslideIcon = (size: [number, number] = [32, 32], highlighted: boo
   });
 };
 
-// Hàm chuyển đổi tọa độ UTM sang LatLng
-// Dựa trên mã mẫu đã cung cấp
-function convertToLatLng(east: number, north: number): L.LatLng {
-  // Thông số cho việc chuyển đổi (cần điều chỉnh cho vùng cụ thể)
-  // Đây là ước tính cho khu vực Việt Nam (khoảng vùng UTM 48N/49N)
-  const originLat = 20.0; // Ước lượng vĩ độ gốc
-  const originLng = 105.0; // Ước lượng kinh độ gốc
+// Hàm tính toán UTM zone từ kinh độ
+function getUTMZone(longitude: number): number {
+  return Math.floor((longitude + 180) / 6) + 1;
+}
+
+// Hàm chuyển đổi tọa độ UTM sang LatLng sử dụng Proj4js
+function convertToLatLng(east: number, north: number, knownLongitude: number, knownLatitude: number): L.LatLng {
+  // Xác định UTM zone dựa trên kinh độ đã biết
+  const utmZone = getUTMZone(knownLongitude);
   
-  // Hệ số chuyển đổi (cần điều chỉnh)
-  const mPerDegreeLat = 111320; // Khoảng 111.32 km cho 1 độ vĩ độ
-  const mPerDegreeLng = 110000; // Khoảng cần điều chỉnh tùy theo vĩ độ
+  // Xác định bán cầu (N hoặc S) dựa trên vĩ độ đã biết
+  const hemisphere = knownLatitude >= 0 ? 'N' : 'S';
   
-  // Điểm tham chiếu (giả định)
-  const refEast = 500000; // Điểm giữa của vùng UTM
-  const refNorth = 2300000; // Ước tính cho vùng Bắc Việt Nam
+  // Định nghĩa các hệ tọa độ
+  proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs');
+  const utmProjection = `+proj=utm +zone=${utmZone} +${hemisphere} +datum=WGS84 +units=m +no_defs`;
   
-  // Tính toán sự chênh lệch
-  const deltaEast = east - refEast;
-  const deltaNorth = north - refNorth;
-  
-  // Chuyển đổi sang độ
-  const deltaLng = deltaEast / mPerDegreeLng;
-  const deltaLat = deltaNorth / mPerDegreeLat;
-  
-  // Tính tọa độ cuối cùng
-  const lat = originLat + deltaLat;
-  const lng = originLng + deltaLng;
+  // Thực hiện chuyển đổi
+  const [lng, lat] = proj4(utmProjection, 'EPSG:4326', [east, north]);
   
   return L.latLng(lat, lng);
 }
@@ -79,7 +74,9 @@ const LandslideMarkerLayer = ({
   iconSize = [32, 32],
   showCircles = true,
   onMarkerClick,
-  highlightedId
+  highlightedId,
+  centerLongitude,
+  centerLatitude
 }: LandslideMarkerLayerProps) => {
   const map = useMap();
   
@@ -93,7 +90,7 @@ const LandslideMarkerLayer = ({
         const eastNum = typeof point.east === 'string' ? parseFloat(point.east) : point.east;
         const northNum = typeof point.north === 'string' ? parseFloat(point.north) : point.north;
         
-        const latLng = convertToLatLng(eastNum, northNum);
+        const latLng = convertToLatLng(eastNum, northNum, centerLongitude, centerLatitude);
         
         // Kiểm tra tọa độ hợp lệ
         if (!isValidLatLng(latLng)) {
@@ -115,7 +112,7 @@ const LandslideMarkerLayer = ({
       coordinate: LandslideCoordinate;
       latLng: L.LatLng;
     }[];
-  }, [coordinates]);
+  }, [coordinates, centerLongitude, centerLatitude]);
   
   // Tự động điều chỉnh view khi coordinates thay đổi
   useEffect(() => {
