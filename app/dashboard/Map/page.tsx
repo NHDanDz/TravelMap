@@ -1,13 +1,11 @@
-// app/dashboard/map/page.tsx
 'use client';
 
-import dynamic from 'next/dynamic';
 import { DashboardLayout } from '@/app/components/layout/DashboardLayout';
-import { useState } from 'react';
-import { Button } from '@/app/components/ui/Button';
-import { Card, CardHeader, CardBody } from '@/app/components/ui/Card';
+import { Suspense, useState } from 'react';
+import dynamic from 'next/dynamic';
+import Link from 'next/link';
 
-// Import động cho component bản đồ để tránh lỗi SSR
+// Import component bản đồ động để tránh lỗi SSR
 const MapContainer = dynamic(
   () => import('./components/MapContainer'),
   {
@@ -17,74 +15,58 @@ const MapContainer = dynamic(
 );
 
 export default function MapPage() {
-  const [mapType, setMapType] = useState<'normal' | 'satellite'>('normal');
-  const [detectionMode, setDetectionMode] = useState<boolean>(false);
-  
   return (
-    <DashboardLayout>
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold mb-2">Bản đồ sạt lở đất</h1>
-        <p className="text-gray-600">Xem bản đồ và phát hiện các điểm sạt lở tiềm ẩn.</p>
-      </div>
+    <>     
+     <style>{`
+      .leaflet-popup-content {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
       
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4">
-        <div className="lg:col-span-3">
-          <Card className="h-[calc(100vh-180px)]">
-            <CardHeader className="p-2 border-b">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-medium">Kiểu bản đồ:</span>
-                  <div className="flex border rounded overflow-hidden">
-                    <button
-                      className={`px-3 py-1 text-sm ${mapType === 'normal' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                      onClick={() => setMapType('normal')}
-                    >
-                      Thường
-                    </button>
-                    <button
-                      className={`px-3 py-1 text-sm ${mapType === 'satellite' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
-                      onClick={() => setMapType('satellite')}
-                    >
-                      Vệ tinh
-                    </button>
-                  </div>
-                </div>
-                
-                <Button
-                  variant={detectionMode ? "success" : "primary"}
-                  onClick={() => setDetectionMode(!detectionMode)}
-                  size="sm"
-                >
-                  {detectionMode ? "Đang trong chế độ phát hiện" : "Bật chế độ phát hiện"}
-                </Button>
-              </div>
-            </CardHeader>
-            <CardBody className="p-0">
-              <MapContainer mapType={mapType} detectionMode={detectionMode} />
-            </CardBody>
-          </Card>
+      .leaflet-popup-content-wrapper {
+        padding: 0 !important;
+        overflow: hidden;
+        border-radius: 8px !important;
+      }
+      
+      .leaflet-popup-close-button {
+        color: #3b82f6 !important;
+        font-size: 18px !important;
+        padding: 6px 6px 0 0 !important;
+      }
+    `}</style>
+     <DashboardLayout>
+      <div className="flex flex-col h-[calc(100vh-100px)]">
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold mb-2">Bản đồ sạt lở đất</h1>
+          <p className="text-gray-600">Xem bản đồ và phát hiện các điểm sạt lở tiềm ẩn.</p>
         </div>
         
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <h2 className="text-lg font-medium">Phát hiện sạt lở</h2>
-            </CardHeader>
-            <CardBody>
+        <div className="flex-1 flex overflow-hidden">
+          {/* Container chính chứa bản đồ */}
+          <div className="flex-1 bg-white rounded-lg shadow-sm overflow-hidden">
+            <Suspense fallback={<div className="w-full h-full bg-gray-100 animate-pulse" />}>
+              <MapContainer />
+            </Suspense>
+          </div>
+          
+          {/* Sidebar - không cố định kích thước để responsive trên mobile */}
+          <div className="w-80 ml-4 space-y-4 overflow-y-auto hidden lg:block">
+            <div className="bg-white rounded-lg shadow-sm p-4">
+              <h2 className="text-lg font-medium mb-3">Phát hiện sạt lở</h2>
               <p className="text-sm text-gray-600 mb-4">
                 Nhấp vào bản đồ để chọn vị trí và phân tích nguy cơ sạt lở đất trong khu vực đó.
               </p>
-              <Button variant="primary" className="w-full" onClick={() => setDetectionMode(true)}>
-                Bật chế độ phát hiện
-              </Button>
-            </CardBody>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <h2 className="text-lg font-medium">Hướng dẫn sử dụng</h2>
-            </CardHeader>
-            <CardBody>
+              <Link 
+                href="/dashboard/Map/fullscreen"
+                className="block w-full bg-blue-500 hover:bg-blue-600 text-white text-center py-2 px-4 rounded"
+              >
+                Xem bản đồ toàn màn hình
+              </Link>
+            </div>
+            
+            <div className="bg-white rounded-lg shadow-sm p-4">
+              <h2 className="text-lg font-medium mb-3">Hướng dẫn sử dụng</h2>
               <ul className="space-y-2 text-sm text-gray-600">
                 <li className="flex items-start">
                   <span className="bg-blue-100 text-blue-800 rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2 mt-0.5">1</span>
@@ -100,17 +82,13 @@ export default function MapPage() {
                 </li>
                 <li className="flex items-start">
                   <span className="bg-blue-100 text-blue-800 rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2 mt-0.5">4</span>
-                  <span>Đợi kết quả phân tích (có thể mất 30-60 giây)</span>
+                  <span>Đợi kết quả phân tích (có thể mất 1-2 phút)</span>
                 </li>
               </ul>
-            </CardBody>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <h2 className="text-lg font-medium">Lịch sử phân tích</h2>
-            </CardHeader>
-            <CardBody>
+            </div>
+            
+            <div className="bg-white rounded-lg shadow-sm p-4">
+              <h2 className="text-lg font-medium mb-3">Lịch sử phân tích</h2>
               <div className="space-y-3">
                 <div className="border-l-4 border-red-500 pl-2 py-1">
                   <div className="text-sm font-medium">Đèo Ô Quý Hồ</div>
@@ -128,10 +106,11 @@ export default function MapPage() {
                   </button>
                 </div>
               </div>
-            </CardBody>
-          </Card>
+            </div>
+          </div>
         </div>
       </div>
     </DashboardLayout>
+    </>
   );
 }

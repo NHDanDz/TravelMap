@@ -12,10 +12,7 @@ export function Header() {
               Quản lý và Theo dõi Sạt lở đất
             </Link>
           </div>
-          <div className="flex items-center space-x-4">
-            <Link href="/dashboard/map" className="text-gray-600 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
-              Bản đồ trực tiếp
-            </Link>
+          <div className="flex items-center space-x-4"> 
             <Link href="/dashboard/statistics" className="text-gray-600 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
               Thống kê
             </Link>

@@ -1,4 +1,6 @@
 // app/components/layout/Sidebar.tsx
+'use client';
+
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -33,7 +35,7 @@ export function Sidebar() {
       )
     },
     {
-      href: '/dashboard/map',
+      href: '/dashboard/Map',
       label: 'Bản đồ',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

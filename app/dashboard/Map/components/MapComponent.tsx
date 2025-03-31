@@ -17,6 +17,13 @@ const customIcon = L.icon({
   shadowSize: [41, 41]
 });
 
+export interface MapComponentProps {
+  goToCoords?: { lat: number; lng: number } | null;
+  detectionMode?: boolean;
+  fullscreen?: boolean;
+}
+
+
 // Hàm tính toán hình vuông 5000x5000m xung quanh điểm
 function calculateSquareBounds(latLng: L.LatLng): L.LatLngBounds {
   // Độ dài 2500m tính theo độ (xấp xỉ)
@@ -133,10 +140,10 @@ function LocationMarker({
 }
 
 export default function MapComponent({ 
-  goToCoords = null 
-}: { 
-  goToCoords?: { lat: number; lng: number } | null 
-}) {
+  goToCoords = null,
+  detectionMode = false,
+  fullscreen = false
+}: MapComponentProps) {
   const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null);
   const [loading, setLoading] = useState(true);
   const [sendStatus, setSendStatus] = useState<{
@@ -347,15 +354,28 @@ export default function MapComponent({
   if (loading) {
     return <div className="w-full h-full bg-gray-100 animate-pulse" />;
   }
-
+  const containerClass = fullscreen 
+    ? "w-full h-screen" 
+    : "w-full h-full min-h-[600px]";
+  
   return (
-    <div className="relative w-full h-full">
+    <div className={`w-full h-full ${fullscreen ? 'absolute inset-0' : 'relative'}`}>
       <MapContainer
         center={currentLocation || [21.0285, 105.8542]}
         zoom={13}
         scrollWheelZoom={true}
         className="w-full h-full"
+        zoomControl={false} // Tắt zoom control mặc định
+        attributionControl={false} // Tắt attribution control mặc định
       >
+      <div className="leaflet-control-container">
+        <div className="leaflet-top leaflet-right" style={{ zIndex: 1000, marginTop: '10px', marginRight: '10px' }}>
+          <div className="leaflet-control-zoom leaflet-bar leaflet-control">
+            <a className="leaflet-control-zoom-in" href="#" title="Zoom in" role="button" aria-label="Zoom in">+</a>
+            <a className="leaflet-control-zoom-out" href="#" title="Zoom out" role="button" aria-label="Zoom out">−</a>
+          </div>
+        </div>
+      </div>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -379,11 +399,11 @@ export default function MapComponent({
 
       {/* Thông báo trạng thái */}
       {sendStatus.status !== 'idle' && (
-        <div className={`absolute bottom-4 right-4 p-4 rounded-lg shadow-lg z-[9999] ${
-          sendStatus.status === 'sending' ? 'bg-blue-100 text-blue-800' :
-          sendStatus.status === 'success' ? 'bg-green-100 text-green-800' :
-          'bg-red-100 text-red-800'
-        }`}>
+      <div className={`absolute bottom-4 right-4 p-4 rounded-lg shadow-lg z-[9999] ${
+        sendStatus.status === 'sending' ? 'bg-blue-100 text-blue-800' :
+        sendStatus.status === 'success' ? 'bg-green-100 text-green-800' :
+        'bg-red-100 text-red-800'
+      }`}>
           {sendStatus.status === 'sending' && 'Đang gửi tọa độ...'}
           {sendStatus.status === 'success' && sendStatus.message}
           {sendStatus.status === 'error' && `Lỗi: ${sendStatus.message}`}
@@ -431,6 +451,6 @@ export default function MapComponent({
           </button>
         </div>
       )}
-    </div>
+    </div> 
   );
 }

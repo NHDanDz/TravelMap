@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Rectangle, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import LandslideMarkerLayer from './LandslideMarkerLayer';
+import LandslideMarkerLayer from './LandslideMarkerLayer'; 
 
 // Định nghĩa các kiểu dữ liệu
 interface LandslideCoordinate {
@@ -45,6 +45,8 @@ interface MapCenterControlProps {
 
 interface SatelliteMapComponentProps {
   goToCoords?: { lat: number; lng: number } | null;
+  detectionMode?: boolean;
+  fullscreen?: boolean;
 }
 
 // Custom icon configuration
@@ -142,37 +144,61 @@ function LocationMarker({
   return (
     <>
       {position === null ? null : (
-        <>
-          <Marker position={position} icon={customIcon}>
-            <Popup>
-              <div>
-                <h3 className="font-medium">Vị trí đã chọn</h3>
-                <p className="text-sm">Kinh độ: {position.lng.toFixed(6)}</p>
-                <p className="text-sm">Vĩ độ: {position.lat.toFixed(6)}</p>
+      <>
+        <Marker position={position} icon={customIcon}>
+          <Popup className="custom-popup">
+            <div className="bg-white p-3 rounded-lg shadow-sm">
+              <h3 className="font-bold text-blue-600 border-b pb-2 mb-2">Vị trí đã chọn</h3>
+              <div className="space-y-1">
+                <div className="flex items-center">
+                  <span className="text-gray-600 text-sm font-medium w-20">Kinh độ:</span>
+                  <span className="text-sm bg-blue-50 py-1 px-2 rounded font-mono">{position.lng.toFixed(6)}</span>
+                </div>
+                <div className="flex items-center">
+                  <span className="text-gray-600 text-sm font-medium w-20">Vĩ độ:</span>
+                  <span className="text-sm bg-blue-50 py-1 px-2 rounded font-mono">{position.lat.toFixed(6)}</span>
+                </div>
+              </div>
+            </div>
+          </Popup>
+        </Marker>
+        {bounds && (
+          <Rectangle 
+            bounds={bounds}
+            pathOptions={{
+              color: '#1e40af', // Darker blue border
+              fillColor: '#60a5fa', // Lighter blue fill
+              fillOpacity: 0.2, // More transparent
+              weight: 3, // Slightly thicker border
+              dashArray: '5, 5', // Dashed line pattern
+              lineCap: 'round',
+              lineJoin: 'round'
+            }}
+          >
+            <Popup className="custom-popup">
+              <div className="bg-white p-3 rounded-lg shadow-sm max-w-xs">
+                <h3 className="font-bold text-blue-600 border-b pb-2 mb-2">Vùng phân tích</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center bg-blue-50 p-2 rounded">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <span className="text-sm font-medium">Kích thước: 5km × 5km</span>
+                  </div>
+                  <div className="flex items-center bg-yellow-50 p-2 rounded">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-yellow-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span className="text-sm font-medium">Phạm vi kiểm tra lở đất</span>
+                  </div>
+                </div>
               </div>
             </Popup>
-          </Marker>
-          {bounds && (
-            <Rectangle 
-              bounds={bounds}
-              pathOptions={{
-                color: '#0c4cb3',
-                fillColor: '#3b82f6',
-                fillOpacity: 0.3,
-                weight: 2
-              }}
-            >
-              <Popup>
-                <div>
-                  <h3 className="font-medium">Vùng phân tích</h3>
-                  <p className="text-sm">Kích thước: 5km × 5km</p>
-                  <p className="text-sm">Phạm vi kiểm tra lở đất</p>
-                </div>
-              </Popup>
-            </Rectangle>
-          )}
-        </>
-      )}
+          </Rectangle>
+        )}
+      </>
+    )}
+
       
       {/* Hộp thoại xác nhận - chỉ hiển thị ở chế độ normal */}
       {showConfirmDialog && clickedPosition && viewMode === 'normal' && (
@@ -231,7 +257,9 @@ function LocationMarker({
 }
 
 export default function SatelliteMapComponent({ 
-  goToCoords = null 
+  goToCoords = null,
+  detectionMode = false,
+  fullscreen = false
 }: SatelliteMapComponentProps) {
   const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -585,15 +613,30 @@ export default function SatelliteMapComponent({
   if (loading) {
     return <div className="w-full h-full bg-gray-100 animate-pulse" />;
   }
+  const containerClass = fullscreen 
+  ? "w-full h-screen" 
+  : "w-full h-full min-h-[600px]";
 
   return (
-    <div className="relative w-full h-full">
-      <MapContainer
-        center={currentLocation || [21.0285, 105.8542]}
-        zoom={13}
-        scrollWheelZoom={true}
-        className="w-full h-full"
-      >
+    <div className={`w-full h-full ${fullscreen ? 'absolute inset-0' : 'relative'}`}>
+    <MapContainer
+      center={currentLocation || [21.0285, 105.8542]}
+      zoom={13}
+      scrollWheelZoom={true}
+      className="w-full h-full"
+      zoomControl={false} // Tắt zoom control mặc định
+      attributionControl={false} // Tắt attribution control mặc định
+    >
+      {/* Thêm controls cho zoom ở vị trí không bị che */}
+      <div className="leaflet-control-container">
+        <div className="leaflet-top leaflet-right" style={{ zIndex: 1000, marginTop: '10px', marginRight: '10px' }}>
+          <div className="leaflet-control-zoom leaflet-bar leaflet-control">
+            <a className="leaflet-control-zoom-in" href="#" title="Zoom in" role="button" aria-label="Zoom in">+</a>
+            <a className="leaflet-control-zoom-out" href="#" title="Zoom out" role="button" aria-label="Zoom out">−</a>
+          </div>
+        </div>
+      </div>
+      
         {/* Use satellite map layer from Esri */}
         <TileLayer
           attribution='&copy; <a href="https://www.esri.com/en-us/home">Esri</a>'
@@ -649,12 +692,13 @@ export default function SatelliteMapComponent({
           </button>
         </div>
       )}
+
       
       {/* Hiển thị trạng thái chi tiết trong quá trình xử lý */}
       {landslideResults && !landslideResults.model_processing_completed && (
-        <div className="absolute  bottom-16 left-4 p-4 bg-white rounded-lg shadow-lg z-[9999]">
-          <h3 className="font-bold">Đang xử lý...</h3>
-          <p className="text-sm">
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 p-4 bg-white bg-opacity-90 backdrop-blur-sm rounded-lg shadow-lg z-[9999] w-80 mx-auto">
+          <h3 className="font-bold text-center">Đang xử lý...</h3>
+          <p className="text-sm text-center mt-1">
             {landslideResults.status === 'processing' && 'Khởi tạo xử lý...'}
             {landslideResults.status === 'processing_images' && 'Đang xử lý ảnh vệ tinh...'}
             {landslideResults.status === 'detecting_landslides' && 'Đang phát hiện lở đất...'}
@@ -753,6 +797,6 @@ export default function SatelliteMapComponent({
           </button>
         </div>
       )}
-    </div>
+    </div> 
   );
 }

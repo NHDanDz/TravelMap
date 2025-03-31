@@ -146,7 +146,7 @@ export default function DashboardPage() {
             <CardBody>
               <div className="grid grid-cols-2 gap-4">
                 <Link 
-                  href="/dashboard/map" 
+                  href="/dashboard/Map" 
                   className="flex flex-col items-center p-4 border rounded-lg hover:bg-blue-50 transition"
                 >
                   <svg className="w-8 h-8 text-blue-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
