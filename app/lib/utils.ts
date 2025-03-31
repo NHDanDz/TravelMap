@@ -67,3 +67,30 @@ export const generatePagination = (currentPage: number, totalPages: number) => {
     totalPages,
   ];
 };
+export function formatDate(dateString: string, locale: string = 'vi-VN'): string {
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat(locale, {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }).format(date);
+}
+
+export function getStatusColor(status: string): string {
+  switch(status) {
+    case 'high_risk': return 'red';
+    case 'active': return 'orange';
+    case 'stabilized': return 'green';
+    case 'monitored': return 'blue';
+    default: return 'gray';
+  }
+}
+
+export function getRiskLevelColor(level: string): string {
+  switch(level) {
+    case 'high': return 'red';
+    case 'medium': return 'orange';
+    case 'low': return 'green';
+    default: return 'gray';
+  }
+}

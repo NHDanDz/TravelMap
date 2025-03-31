@@ -652,7 +652,7 @@ export default function SatelliteMapComponent({
       
       {/* Hiển thị trạng thái chi tiết trong quá trình xử lý */}
       {landslideResults && !landslideResults.model_processing_completed && (
-        <div className="absolute bottom-16 left-4 p-4 bg-white rounded-lg shadow-lg z-[9999]">
+        <div className="absolute  bottom-16 left-4 p-4 bg-white rounded-lg shadow-lg z-[9999]">
           <h3 className="font-bold">Đang xử lý...</h3>
           <p className="text-sm">
             {landslideResults.status === 'processing' && 'Khởi tạo xử lý...'}
