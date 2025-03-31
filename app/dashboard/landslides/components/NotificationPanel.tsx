@@ -1,10 +1,23 @@
+// app/dashboard/landslides/components/NotificationPanel.tsx
 import { useState } from 'react';
 import { NotificationSettings, Alert } from '@/app/lib/types/landslide';
 
 interface NotificationPanelProps {
   settings: NotificationSettings;
   alerts: Alert[];
-  onSettingsChange: (settings: NotificationSettings) => void;
+  onSettingsChange: (settings: NotificationSettings) => Promise<void>;
+}
+
+// Helper function to format date
+function formatDate(dateString: string, locale: string = 'vi-VN'): string {
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat(locale, {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date);
 }
 
 export default function NotificationPanel({ settings, alerts, onSettingsChange }: NotificationPanelProps) {
@@ -13,7 +26,11 @@ export default function NotificationPanel({ settings, alerts, onSettingsChange }
   const handleSettingChange = (field: keyof NotificationSettings, value: any) => {
     const updatedSettings = { ...notificationSettings, [field]: value };
     setNotificationSettings(updatedSettings);
-    onSettingsChange(updatedSettings);
+  };
+
+  const handleSaveSettings = async () => {
+    await onSettingsChange(notificationSettings);
+    // No need to handle return value since it's void
   };
 
   return (
@@ -159,7 +176,7 @@ export default function NotificationPanel({ settings, alerts, onSettingsChange }
           <div className="mt-4">
             <button 
               className="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition"
-              onClick={() => onSettingsChange(notificationSettings)}
+              onClick={handleSaveSettings}
             >
               Lưu cài đặt
             </button>

@@ -187,7 +187,7 @@ export default function LandslidesContent() {
       setNotificationSettings(settings);
     }
     
-    return success;
+    // No return value needed for void promise
   };
 
   if (isLoading) {

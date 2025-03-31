@@ -1,12 +1,21 @@
 // app/dashboard/landslides/components/LandslideCard.tsx
 import { StatusBadge } from '@/app/components/ui/StatusBadge';
-import { formatDate } from '@/app/lib/utils';
 import { LandslidePoint } from '@/app/lib/types/landslide';
 
 interface LandslideCardProps {
   landslide: LandslidePoint;
   onClick: (landslide: LandslidePoint) => void;
   isSelected: boolean;
+}
+
+// Helper function to format date if the imported one isn't available
+function formatDate(dateString: string, locale: string = 'vi-VN'): string {
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat(locale, {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }).format(date);
 }
 
 export default function LandslideCard({ landslide, onClick, isSelected }: LandslideCardProps) {

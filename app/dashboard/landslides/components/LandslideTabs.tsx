@@ -15,8 +15,8 @@ interface LandslideTabsProps {
   initialMonitoredAreas: MonitoringArea[];
   initialNotificationSettings: NotificationSettings;
   initialAlerts: Alert[];
-  onSaveLandslide: (landslide: LandslidePoint) => Promise<void>;
-  onSaveMonitoringArea: (area: MonitoringArea) => Promise<void>;
+  onSaveLandslide: (landslide: LandslidePoint) => Promise<boolean>;
+  onSaveMonitoringArea: (area: MonitoringArea) => Promise<boolean>;
   onSaveNotificationSettings: (settings: NotificationSettings) => Promise<void>;
 }
 
@@ -64,21 +64,23 @@ export default function LandslideTabs({
     };
     
     // Save to database via server action
-    await onSaveMonitoringArea(newArea);
+    const success = await onSaveMonitoringArea(newArea);
     
     // Update local state
-    setMonitoredAreas([...monitoredAreas, newArea]);
-    setShowAddMonitorModal(false);
-    
-    // Alert user
-    alert(`Đã thêm "${selectedLandslide?.name}" vào danh sách theo dõi liên tục!`);
+    if (success) {
+      setMonitoredAreas([...monitoredAreas, newArea]);
+      setShowAddMonitorModal(false);
+      
+      // Alert user
+      alert(`Đã thêm "${selectedLandslide?.name}" vào danh sách theo dõi liên tục!`);
+    }
   };
 
   const handleSettingsChange = async (settings: NotificationSettings) => {
     // Save to database via server action
     await onSaveNotificationSettings(settings);
     
-    // Update local state
+    // Update local state directly since we don't have a success flag
     setNotificationSettings(settings);
     
     // Alert user

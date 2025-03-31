@@ -1,6 +1,6 @@
-import { pgTable, serial, text, timestamp, integer, boolean, json, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, timestamp, integer, boolean, pgEnum } from 'drizzle-orm/pg-core';
 
-// Enum cho trạng thái sạt lở
+// Enum đơn giản cho trạng thái sạt lở
 export const landslideStatusEnum = pgEnum('landslide_status', [
   'high_risk',
   'active',
@@ -10,9 +10,9 @@ export const landslideStatusEnum = pgEnum('landslide_status', [
 
 // Enum cho tần suất giám sát
 export const monitorFrequencyEnum = pgEnum('monitor_frequency', [
-  'daily',
-  'weekly',
-  'biweekly',
+  'daily', 
+  'weekly', 
+  'biweekly', 
   'monthly'
 ]);
 
@@ -59,16 +59,12 @@ export const landslides = pgTable('landslides', {
   lng: text('lng').notNull(),
   detectedAt: timestamp('detected_at').notNull().defaultNow(),
   status: landslideStatusEnum('status').notNull(),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
   affectedArea: text('affected_area'),
   potentialImpact: text('potential_impact'),
   lastUpdate: timestamp('last_update').notNull().defaultNow(),
-  history: json('history').$type<{
-    date: string;
-    status: string;
-    note: string;
-  }[]>().default([]),
+  history: text('history'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow()
 });
 
 // Bảng khu vực theo dõi
@@ -86,7 +82,7 @@ export const monitoringAreas = pgTable('monitoring_areas', {
   detectedPoints: integer('detected_points').notNull().default(0),
   riskLevel: riskLevelEnum('risk_level').notNull(),
   landslideId: text('landslide_id').references(() => landslides.id),
-  autoVerify: boolean('auto_verify').default(false),
+  autoVerify: boolean('auto_verify').default(false)
 });
 
 // Bảng cài đặt thông báo
@@ -103,7 +99,7 @@ export const notificationSettings = pgTable('notification_settings', {
   autoMonitor: boolean('auto_monitor').notNull().default(false),
   monthlyReport: boolean('monthly_report').notNull().default(true),
   createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow()
 });
 
 // Bảng cảnh báo
@@ -117,5 +113,5 @@ export const alerts = pgTable('alerts', {
   monitoringAreaId: text('monitoring_area_id').references(() => monitoringAreas.id),
   read: boolean('read').notNull().default(false),
   userId: text('user_id').notNull(),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
+  createdAt: timestamp('created_at').notNull().defaultNow()
 });
