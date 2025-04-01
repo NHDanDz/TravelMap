@@ -43,6 +43,8 @@ export default function LandslideList({
               <option value="high_risk">Nguy cơ cao</option>
               <option value="active">Đang hoạt động</option>
               <option value="stabilized">Đã ổn định</option>
+              <option value="monitored">Đang theo dõi</option>
+              <option value="remediated">Đã xử lý</option>
             </select>
           </div>
           <button className="bg-blue-50 text-blue-700 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium rounded-lg text-sm px-4 py-2 flex items-center">

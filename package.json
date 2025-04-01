@@ -4,7 +4,10 @@
     "build": "next build",
     "dev": "next dev --turbopack",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:generate": "drizzle-kit generate:pg",
+    "db:migrate": "node -r dotenv/config migrate.js",
+    "db:push": "drizzle-kit push:pg"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.0",
@@ -45,9 +48,11 @@
     "@typescript-eslint/parser": "8.24.0",
     "autoprefixer": "10.4.20",
     "dotenv": "^16.4.7",
+    "drizzle-kit": "^0.30.6",
     "eslint-config-next": "15.1.7",
     "pg": "^8.14.1",
     "postcss": "8.5.1",
-    "tailwindcss": "3.4.17"
+    "tailwindcss": "3.4.17",
+    "tsx": "^4.19.3"
   }
 }

@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/app/lib/db';
 import { landslides, alerts } from '@/app/lib/db/schema';
 import { v4 as uuidv4 } from 'uuid';
+import { and, between, gte, lte } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 
 // Định nghĩa kiểu dữ liệu 
 interface Coordinates {
@@ -27,7 +29,7 @@ interface LandslideData {
   name: string;
   coordinates: Coordinates;
   detectedAt: string;
-  status: 'high_risk' | 'active' | 'stabilized' | 'monitored';
+  status: 'high_risk' | 'active' | 'stabilized' | 'monitored' | 'remediated';
   details: LandslideDetail;
   history: HistoryItem[];
   note?: string;
@@ -36,20 +38,37 @@ interface LandslideData {
   image?: string | null;
 }
 
-// Định nghĩa interface cho record từ bảng landslides
-interface LandslideRecord {
-  id: string;
-  name: string;
-  lat: string;
-  lng: string;
-  detectedAt: Date;
-  status: 'high_risk' | 'active' | 'stabilized' | 'monitored';
-  affectedArea: string | null;
-  potentialImpact: string | null;
-  lastUpdate: Date;
-  history: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+// Hàm kiểm tra tọa độ đã tồn tại trong database hay chưa
+async function checkCoordinateExists(lat: number, lng: number, tolerance: number = 0.0001) {
+  try {
+    // Tính toán phạm vi tọa độ để tìm kiếm
+    const minLat = lat - tolerance;
+    const maxLat = lat + tolerance;
+    const minLng = lng - tolerance;
+    const maxLng = lng + tolerance;
+    
+    // Tìm kiếm trong database sử dụng phương pháp khác để tránh vấn đề kiểu dữ liệu
+    const existingLandslides = await db
+      .select()
+      .from(landslides)
+      .where(
+        and(
+          gte(sql`CAST(${landslides.lat} AS float)`, minLat),
+          lte(sql`CAST(${landslides.lat} AS float)`, maxLat),
+          gte(sql`CAST(${landslides.lng} AS float)`, minLng),
+          lte(sql`CAST(${landslides.lng} AS float)`, maxLng)
+        )
+      );
+    
+    return {
+      exists: existingLandslides.length > 0,
+      landslide: existingLandslides.length > 0 ? existingLandslides[0] : null
+    };
+  } catch (error) {
+    console.error('Error checking coordinates in database:', error);
+    // Trong trường hợp lỗi, coi như không tìm thấy để cho phép tiếp tục
+    return { exists: false, landslide: null };
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -65,6 +84,31 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Kiểm tra xem tọa độ đã tồn tại trong database chưa
+    const { exists, landslide: existingLandslide } = await checkCoordinateExists(
+      formData.coordinates.lat,
+      formData.coordinates.lng
+    );
+    
+    // Nếu tọa độ đã tồn tại, trả về thông báo lỗi
+    if (exists && existingLandslide) {
+      return NextResponse.json(
+        { 
+          error: 'Tọa độ đã tồn tại trong hệ thống.', 
+          duplicate: true,
+          landslide: {
+            id: existingLandslide.id,
+            name: existingLandslide.name,
+            lat: existingLandslide.lat,
+            lng: existingLandslide.lng,
+            status: existingLandslide.status,
+            detectedAt: existingLandslide.first_detected_at
+          }
+        },
+        { status: 409 } // Conflict status code
+      );
+    }
+    
     // Tạo ID nếu chưa có
     const id = formData.id || `LS${Date.now().toString().slice(-6)}`;
     
@@ -76,14 +120,14 @@ export async function POST(request: NextRequest) {
         name: formData.name,
         lat: formData.coordinates.lat.toString(),
         lng: formData.coordinates.lng.toString(),
-        detectedAt: new Date(formData.detectedAt),
+        first_detected_at: new Date(formData.detectedAt),
         status: formData.status,
-        affectedArea: formData.details.affectedArea,
-        potentialImpact: formData.details.potentialImpact,
-        lastUpdate: new Date(formData.details.lastUpdate),
+        affected_area: formData.details.affectedArea,
+        potential_impact: formData.details.potentialImpact,
+        last_update: new Date(formData.details.lastUpdate),
         history: JSON.stringify(formData.history),
-        createdAt: new Date(),
-        updatedAt: new Date()
+        created_at: new Date(),
+        updated_at: new Date()
       });
       
       // Tạo cảnh báo khi xác nhận sạt lở
@@ -92,10 +136,10 @@ export async function POST(request: NextRequest) {
         title: 'Xác nhận điểm sạt lở',
         description: `Đã xác nhận điểm sạt lở tại: ${formData.name}`,
         date: new Date(),
-        landslideId: id,
+        landslide_id: id,
         read: false,
-        userId: 'system', // Có thể thay đổi thành ID người dùng thực tế
-        createdAt: new Date()
+        user_id: 'system', // Có thể thay đổi thành ID người dùng thực tế
+        created_at: new Date()
       });
       
       // Trả về kết quả thành công
@@ -129,7 +173,7 @@ export async function GET(request: NextRequest) {
     const landslideRecords = await db.select().from(landslides);
     
     // Chuyển đổi dữ liệu để phù hợp với định dạng cần thiết
-    const formattedLandslides = landslideRecords.map((record: LandslideRecord) => {
+    const formattedLandslides = landslideRecords.map((record: any) => {
       let history: HistoryItem[] = [];
       try {
         history = JSON.parse(record.history || '[]');
@@ -144,16 +188,16 @@ export async function GET(request: NextRequest) {
           lat: parseFloat(record.lat),
           lng: parseFloat(record.lng)
         },
-        detectedAt: record.detectedAt.toISOString(),
+        detectedAt: record.first_detected_at.toISOString(),
         status: record.status,
         details: {
-          affectedArea: record.affectedArea || '',
-          potentialImpact: record.potentialImpact || '',
-          lastUpdate: record.lastUpdate.toISOString()
+          affectedArea: record.affected_area || '',
+          potentialImpact: record.potential_impact || '',
+          lastUpdate: record.last_update.toISOString()
         },
         history: history,
-        createdAt: record.createdAt.toISOString(),
-        updatedAt: record.updatedAt.toISOString()
+        createdAt: record.created_at.toISOString(),
+        updatedAt: record.updated_at.toISOString()
       };
     });
     

@@ -61,10 +61,63 @@ const LandslideConfirmationForm: React.FC<LandslideConfirmationFormProps> = ({
     note: ''
   });
   const [loading, setLoading] = useState<boolean>(false);
+  const [checkingCoordinates, setCheckingCoordinates] = useState<boolean>(false);
+  const [coordinateExists, setCoordinateExists] = useState<boolean>(false);
+  const [existingLandslide, setExistingLandslide] = useState<any>(null);
+  const [coordinateChecked, setCoordinateChecked] = useState<boolean>(false);
 
   // Thiết lập ngày hiện tại cho trường detectedAt
   const today = new Date().toISOString().slice(0, 10);
   const [detectedAt, setDetectedAt] = useState<string>(today);
+
+  // Kiểm tra tọa độ khi component được mount hoặc khi tọa độ thay đổi
+  useEffect(() => {
+    if (detectedCoordinates) {
+      checkCoordinatesInDatabase();
+    }
+  }, [detectedCoordinates]);
+
+  // Hàm kiểm tra tọa độ trong CSDL
+  const checkCoordinatesInDatabase = async () => {
+    if (!detectedCoordinates) return;
+    
+    try {
+      setCheckingCoordinates(true);
+      
+      // Gọi API để kiểm tra tọa độ
+      const response = await fetch('/api/landslide-confirmation/check', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          lat: detectedCoordinates.lat,
+          lng: detectedCoordinates.lng,
+          // Thêm một ngưỡng dung sai để kiểm tra các điểm gần nhau
+          tolerance: 0.0001 // Xấp xỉ khoảng 10m tại đường xích đạo
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.exists) {
+        setCoordinateExists(true);
+        setExistingLandslide(data.landslide);
+      } else {
+        setCoordinateExists(false);
+        setExistingLandslide(null);
+      }
+      
+      setCoordinateChecked(true);
+    } catch (error) {
+      console.error('Lỗi khi kiểm tra tọa độ:', error);
+      // Nếu có lỗi, giả định là không có tọa độ trùng lặp để cho phép người dùng tiếp tục
+      setCoordinateExists(false);
+      setExistingLandslide(null);
+    } finally {
+      setCheckingCoordinates(false);
+    }
+  };
 
   // Xử lý khi thay đổi trường input
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -78,6 +131,17 @@ const LandslideConfirmationForm: React.FC<LandslideConfirmationFormProps> = ({
   // Xử lý khi submit form
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    
+    // Kiểm tra lại tọa độ nếu chưa kiểm tra
+    if (!coordinateChecked) {
+      await checkCoordinatesInDatabase();
+      
+      // Nếu tọa độ tồn tại, hiển thị thông báo và không cho submit
+      if (coordinateExists) {
+        return;
+      }
+    }
+    
     setLoading(true);
     
     try {
@@ -124,6 +188,45 @@ const LandslideConfirmationForm: React.FC<LandslideConfirmationFormProps> = ({
     >
       <form onSubmit={handleSubmit}>
         <div className="p-4">
+          {/* Hiển thị thông báo nếu tọa độ đã tồn tại */}
+          {coordinateChecked && coordinateExists && existingLandslide && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded-lg">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-yellow-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-yellow-800">Cảnh báo: Tọa độ đã tồn tại</h3>
+                  <div className="mt-2 text-sm text-yellow-700">
+                    <p>Đã có điểm sạt lở tại vị trí này hoặc rất gần đây.</p>
+                    <div className="mt-1">
+                      <p><strong>Tên:</strong> {existingLandslide.name}</p>
+                      <p><strong>ID:</strong> {existingLandslide.id}</p>
+                      <p><strong>Trạng thái:</strong> {existingLandslide.status}</p>
+                    </div>
+                    <div className="mt-2">
+                      <p className="text-orange-800">Bạn có thể chọn cập nhật điểm sạt lở hiện có thay vì tạo mới.</p>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        // Thêm logic để mở form cập nhật hoặc điều hướng đến trang chi tiết
+                        onClose();
+                      }}
+                    >
+                      Xem chi tiết
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Hiển thị hình ảnh khu vực detect */}
           <div className="mb-4">
             <div className="relative h-56 bg-gray-200 rounded-lg overflow-hidden mb-2">
@@ -152,6 +255,17 @@ const LandslideConfirmationForm: React.FC<LandslideConfirmationFormProps> = ({
               <div>
                 <span className="text-gray-500">Kinh độ:</span> {detectedCoordinates?.lng.toFixed(6) || 'N/A'}
               </div>
+            </div>
+            <div className="mt-2 text-xs">
+              {checkingCoordinates ? (
+                <span className="text-blue-600">Đang kiểm tra tọa độ trong CSDL...</span>
+              ) : coordinateChecked ? (
+                coordinateExists ? (
+                  <span className="text-yellow-600">❗ Tọa độ đã tồn tại trong hệ thống.</span>
+                ) : (
+                  <span className="text-green-600">✓ Tọa độ chưa được ghi nhận trước đây.</span>
+                )
+              ) : null}
             </div>
           </div>
 
@@ -276,7 +390,7 @@ const LandslideConfirmationForm: React.FC<LandslideConfirmationFormProps> = ({
           <Button
             type="submit"
             variant="primary"
-            disabled={loading}
+            disabled={loading || (coordinateExists && !!existingLandslide)}
           >
             {loading ? 'Đang lưu...' : 'Xác nhận và lưu'}
           </Button>

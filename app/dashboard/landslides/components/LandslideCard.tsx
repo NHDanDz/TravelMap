@@ -11,12 +11,17 @@ interface LandslideCardProps {
 
 // Helper function to format date if the imported one isn't available
 function formatDate(dateString: string, locale: string = 'vi-VN'): string {
-  const date = new Date(dateString);
-  return new Intl.DateTimeFormat(locale, {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  }).format(date);
+  try {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat(locale, {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).format(date);
+  } catch (error) {
+    console.error("Lỗi khi định dạng ngày:", error);
+    return dateString || 'N/A';
+  }
 }
 
 // Function to generate satellite image URL
@@ -42,6 +47,10 @@ export default function LandslideCard({ landslide, onClick, isSelected }: Landsl
     setImageLoaded(false);
     setImageError(false);
   }, [landslide.id]);
+  
+  // Kiểm tra và đảm bảo dữ liệu hợp lệ
+  const affectedArea = landslide.details?.affectedArea || 'N/A';
+  const lastUpdate = landslide.details?.lastUpdate || landslide.detectedAt || new Date().toISOString();
   
   // Generate the satellite image URL
   const satelliteImageUrl = getSatelliteImageUrl(
@@ -108,10 +117,10 @@ export default function LandslideCard({ landslide, onClick, isSelected }: Landsl
             <span className="text-gray-500">Kinh độ:</span> {landslide.coordinates.lng.toFixed(4)}
           </div>
           <div>
-            <span className="text-gray-500">Diện tích:</span> {landslide.details.affectedArea}
+            <span className="text-gray-500">Diện tích:</span> {affectedArea}
           </div>
           <div>
-            <span className="text-gray-500">Cập nhật:</span> {formatDate(landslide.details.lastUpdate)}
+            <span className="text-gray-500">Cập nhật:</span> {formatDate(lastUpdate)}
           </div>
         </div>
       </div>

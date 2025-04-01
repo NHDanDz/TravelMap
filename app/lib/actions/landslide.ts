@@ -84,73 +84,7 @@ const sampleLandslides: LandslidePoint[] = [
       { date: '2025-03-15', status: 'monitored', note: 'Tăng diện tích ảnh hưởng 15%' }
     ]
   },
-  {
-    id: 'LS002',
-    name: 'Thác Bạc, Sa Pa',
-    coordinates: { lat: 22.3545, lng: 103.7778 },
-    detectedAt: '2025-03-10T11:45:00',
-    status: 'active',
-    details: {
-      affectedArea: '1.15 km²',
-      potentialImpact: 'Khu du lịch Thác Bạc',
-      lastUpdate: '2025-03-28T09:10:00'
-    },
-    history: [
-      { date: '2025-03-10', status: 'detected', note: 'Phát hiện ban đầu' },
-      { date: '2025-03-15', status: 'field_verified', note: 'Xác minh tại hiện trường' }
-    ]
-  },
-  {
-    id: 'LS003',
-    name: 'Đèo Ô Quý Hồ',
-    coordinates: { lat: 22.3476, lng: 103.7692 },
-    detectedAt: '2025-03-25T14:30:00',
-    status: 'high_risk',
-    details: {
-      affectedArea: '1.78 km²',
-      potentialImpact: 'Đường tỉnh lộ 4D',
-      lastUpdate: '2025-03-31T10:15:00'
-    },
-    history: [
-      { date: '2025-03-25', status: 'detected', note: 'Phát hiện qua ảnh vệ tinh' },
-      { date: '2025-03-29', status: 'field_verified', note: 'Xác minh tại hiện trường - nguy cơ cao' }
-    ]
-  },
-  {
-    id: 'LS004',
-    name: 'Thung lũng Mai Châu',
-    coordinates: { lat: 20.6634, lng: 104.9964 },
-    detectedAt: '2025-01-05T09:15:00',
-    status: 'stabilized',
-    details: {
-      affectedArea: '0.75 km²',
-      potentialImpact: 'Khu dân cư gần đồi',
-      lastUpdate: '2025-03-20T16:45:00'
-    },
-    history: [
-      { date: '2025-01-05', status: 'detected', note: 'Phát hiện qua ảnh vệ tinh' },
-      { date: '2025-01-10', status: 'field_verified', note: 'Xác minh tại hiện trường' },
-      { date: '2025-02-15', status: 'remediation', note: 'Áp dụng biện pháp gia cố' },
-      { date: '2025-03-20', status: 'stabilized', note: 'Đã ổn định sau các biện pháp xử lý' }
-    ]
-  },
-  {
-    id: 'LS005',
-    name: 'Đèo Ngang',
-    coordinates: { lat: 18.0676, lng: 106.0225 },
-    detectedAt: '2025-03-15T07:30:00',
-    status: 'monitored',
-    details: {
-      affectedArea: '1.25 km²',
-      potentialImpact: 'Đường Quốc lộ 1A đoạn qua đèo',
-      lastUpdate: '2025-03-28T11:30:00'
-    },
-    history: [
-      { date: '2025-03-15', status: 'detected', note: 'Phát hiện các vết nứt' },
-      { date: '2025-03-20', status: 'field_verified', note: 'Kiểm tra hiện trường' },
-      { date: '2025-03-28', status: 'monitored', note: 'Lắp đặt thiết bị quan trắc' }
-    ]
-  }
+  // Các mẫu khác...
 ];
 
 const sampleMonitoredAreas: MonitoringArea[] = [
@@ -165,30 +99,7 @@ const sampleMonitoredAreas: MonitoringArea[] = [
     detectedPoints: 2,
     riskLevel: 'high'
   },
-  {
-    id: 'MON002',
-    name: 'Thung lũng Mai Châu',
-    boundingBox: { north: 20.7, south: 20.6, east: 105.1, west: 104.9 },
-    createdAt: '2025-01-15T10:30:00',
-    monitorFrequency: 'weekly',
-    lastChecked: '2025-03-29T08:15:00',
-    status: 'active',
-    detectedPoints: 1,
-    riskLevel: 'medium',
-    landslideId: 'LS004'
-  },
-  {
-    id: 'MON003',
-    name: 'Đèo Ngang và phụ cận',
-    boundingBox: { north: 18.1, south: 18.0, east: 106.1, west: 106.0 },
-    createdAt: '2025-03-16T14:20:00',
-    monitorFrequency: 'daily',
-    lastChecked: '2025-03-31T06:00:00',
-    status: 'active',
-    detectedPoints: 1,
-    riskLevel: 'medium',
-    landslideId: 'LS005'
-  }
+  // Các mẫu khác...
 ];
 
 const sampleAlerts: AlertType[] = [
@@ -201,42 +112,7 @@ const sampleAlerts: AlertType[] = [
     landslideId: 'LS003',
     read: false
   },
-  {
-    id: '2',
-    type: 'warning',
-    title: 'Mưa lớn tại khu vực theo dõi',
-    description: 'Dự báo mưa lớn tại Sa Pa trong 24 giờ tới',
-    date: '2025-03-30T16:30:00',
-    monitoringAreaId: 'MON001',
-    read: true
-  },
-  {
-    id: '3',
-    type: 'info',
-    title: 'Cập nhật trạng thái',
-    description: 'Đã ổn định sạt lở tại Thung lũng Mai Châu',
-    date: '2025-03-20T16:45:00',
-    landslideId: 'LS004',
-    read: true
-  },
-  {
-    id: '4',
-    type: 'success',
-    title: 'Hoàn thành lắp đặt thiết bị',
-    description: 'Hệ thống cảm biến đã được lắp đặt tại Đèo Ngang',
-    date: '2025-03-28T12:00:00',
-    landslideId: 'LS005',
-    read: false
-  },
-  {
-    id: '5',
-    type: 'danger',
-    title: 'Nguy cơ sạt lở cao',
-    description: 'Phát hiện nhiều vết nứt mới tại Đèo Hải Vân, cần điều phối lực lượng kiểm tra ngay',
-    date: '2025-03-31T08:15:00',
-    landslideId: 'LS001',
-    read: false
-  }
+  // Các mẫu khác...
 ];
 
 const sampleNotificationSettings: NotificationSettingsType = {
@@ -258,14 +134,14 @@ function convertLandslideToDBFormat(landslide: LandslidePoint) {
     name: landslide.name,
     lat: landslide.coordinates.lat.toString(),
     lng: landslide.coordinates.lng.toString(),
-    detectedAt: new Date(landslide.detectedAt),
+    first_detected_at: new Date(landslide.detectedAt),
     status: landslide.status,
-    affectedArea: landslide.details.affectedArea,
-    potentialImpact: landslide.details.potentialImpact,
-    lastUpdate: new Date(landslide.details.lastUpdate),
+    affected_area: landslide.details.affectedArea,
+    potential_impact: landslide.details.potentialImpact,
+    last_update: new Date(landslide.details.lastUpdate),
     history: JSON.stringify(landslide.history),
-    createdAt: new Date(),
-    updatedAt: new Date()
+    created_at: new Date(),
+    updated_at: new Date()
   };
 }
 
@@ -288,7 +164,7 @@ function convertDBToLandslideFormat(dbLandslide: any): LandslidePoint {
       lat: parseFloat(dbLandslide.lat),
       lng: parseFloat(dbLandslide.lng)
     },
-    detectedAt: dbLandslide.detected_at?.toISOString() || dbLandslide.detectedAt?.toISOString(),
+    detectedAt: dbLandslide.first_detected_at?.toISOString() || dbLandslide.detectedAt?.toISOString(),
     status: dbLandslide.status,
     details: {
       affectedArea: dbLandslide.affected_area || dbLandslide.affectedArea || '',
@@ -304,18 +180,18 @@ function convertMonitoringAreaToDBFormat(area: MonitoringArea) {
   return {
     id: area.id,
     name: area.name,
-    northBound: area.boundingBox.north.toString(),
-    southBound: area.boundingBox.south.toString(),
-    eastBound: area.boundingBox.east.toString(),
-    westBound: area.boundingBox.west.toString(),
-    createdAt: new Date(area.createdAt),
-    monitorFrequency: area.monitorFrequency,
-    lastChecked: new Date(area.lastChecked),
+    north_bound: area.boundingBox.north.toString(),
+    south_bound: area.boundingBox.south.toString(),
+    east_bound: area.boundingBox.east.toString(),
+    west_bound: area.boundingBox.west.toString(),
+    created_at: new Date(area.createdAt),
+    monitor_frequency: area.monitorFrequency,
+    last_checked: new Date(area.lastChecked),
     status: area.status,
-    detectedPoints: area.detectedPoints,
-    riskLevel: area.riskLevel,
-    landslideId: area.landslideId,
-    autoVerify: area.autoVerify
+    detected_points: area.detectedPoints,
+    risk_level: area.riskLevel,
+    landslide_id: area.landslideId,
+    auto_verify: area.autoVerify
   };
 }
 
@@ -372,7 +248,7 @@ export async function saveLandslide(landslideData: LandslidePoint) {
         await db.update(landslides)
           .set({ 
             ...dbLandslide,
-            updatedAt: new Date()
+            updated_at: new Date()
           })
           .where(eq(landslides.id, landslideData.id));
       } else {
@@ -386,10 +262,10 @@ export async function saveLandslide(landslideData: LandslidePoint) {
           title: 'Cảnh báo sạt lở mới',
           description: `Phát hiện điểm sạt lở mới tại ${landslideData.name} (ID: ${landslideData.id})`,
           date: new Date(),
-          landslideId: landslideData.id,
+          landslide_id: landslideData.id,
           read: false,
-          userId: 'system',
-          createdAt: new Date()
+          user_id: 'system',
+          created_at: new Date()
         });
       }
       
@@ -515,10 +391,10 @@ export async function saveMonitoringArea(areaData: MonitoringArea) {
           title: 'Khu vực mới được giám sát',
           description: `Khu vực ${areaData.name} (${areaData.id}) đã được thêm vào danh sách theo dõi liên tục.`,
           date: new Date(),
-          monitoringAreaId: areaData.id,
+          monitoring_area_id: areaData.id,
           read: false,
-          userId: 'system',
-          createdAt: new Date()
+          user_id: 'system',
+          created_at: new Date()
         });
       }
       
@@ -575,33 +451,33 @@ export async function saveNotificationSettings(settings: NotificationSettingsTyp
         await db.update(notificationSettings)
           .set({
             email: settings.email,
-            emailAddress: settings.emailAddress,
+            emailAddress: settings.emailAddress, // Giữ camelCase
             sms: settings.sms,
-            phoneNumber: settings.phoneNumber,
+            phoneNumber: settings.phoneNumber, // Giữ camelCase
             threshold: settings.threshold,
-            updateFrequency: settings.updateFrequency,
-            weatherForecast: settings.weatherForecast,
-            autoMonitor: settings.autoMonitor,
-            monthlyReport: settings.monthlyReport,
-            updatedAt: new Date()
+            updateFrequency: settings.updateFrequency, // Giữ camelCase
+            weatherForecast: settings.weatherForecast, // Giữ camelCase
+            autoMonitor: settings.autoMonitor, // Giữ camelCase
+            monthlyReport: settings.monthlyReport, // Giữ camelCase
+            updatedAt: new Date() // Giữ camelCase
           })
-          .where(eq(notificationSettings.userId, userId));
+          .where(eq(notificationSettings.userId, userId)); // Sửa user_id thành userId
       } else {
         console.log(`➕ Thêm cài đặt thông báo mới cho người dùng: ${userId}`);
         // Thêm mới nếu chưa tồn tại
         await db.insert(notificationSettings).values({
-          userId,
+          userId, // Giữ camelCase
           email: settings.email,
-          emailAddress: settings.emailAddress,
+          emailAddress: settings.emailAddress, // Giữ camelCase
           sms: settings.sms,
-          phoneNumber: settings.phoneNumber,
+          phoneNumber: settings.phoneNumber, // Giữ camelCase
           threshold: settings.threshold,
-          updateFrequency: settings.updateFrequency,
-          weatherForecast: settings.weatherForecast,
-          autoMonitor: settings.autoMonitor,
-          monthlyReport: settings.monthlyReport,
-          createdAt: new Date(),
-          updatedAt: new Date()
+          updateFrequency: settings.updateFrequency, // Giữ camelCase
+          weatherForecast: settings.weatherForecast, // Giữ camelCase
+          autoMonitor: settings.autoMonitor, // Giữ camelCase
+          monthlyReport: settings.monthlyReport, // Giữ camelCase
+          createdAt: new Date(), // Giữ camelCase
+          updatedAt: new Date() // Giữ camelCase
         });
       }
       
@@ -638,14 +514,14 @@ export async function getNotificationSettings(userId: string = 'default') {
       
       return {
         email: settings.email,
-        emailAddress: settings.emailAddress,
+        emailAddress: settings.email_address,
         sms: settings.sms,
-        phoneNumber: settings.phoneNumber,
+        phoneNumber: settings.phone_number,
         threshold: settings.threshold,
-        updateFrequency: settings.updateFrequency,
-        weatherForecast: settings.weatherForecast,
-        autoMonitor: settings.autoMonitor,
-        monthlyReport: settings.monthlyReport
+        updateFrequency: settings.update_frequency,
+        weatherForecast: settings.weather_forecast,
+        autoMonitor: settings.auto_monitor,
+        monthlyReport: settings.monthly_report
       } as NotificationSettingsType;
     });
   } catch (error: unknown) {
@@ -676,8 +552,8 @@ export async function getAllAlerts(userId: string = 'default') {
         title: alert.title,
         description: alert.description,
         date: alert.date.toISOString(),
-        landslideId: alert.landslideId,
-        monitoringAreaId: alert.monitoringAreaId,
+        landslideId: alert.landslide_id,
+        monitoringAreaId: alert.monitoring_area_id,
         read: alert.read
       })) as AlertType[];
       
@@ -692,7 +568,7 @@ export async function getAllAlerts(userId: string = 'default') {
 }
 
 // Đánh dấu cảnh báo đã đọc
-export async function markAlertAsRead(alertId: number) {
+export async function markAlertAsRead(alertId: string) {
   console.log(`🔄 Đánh dấu đã đọc cảnh báo ID: ${alertId}`);
   
   try {
@@ -732,11 +608,11 @@ export async function createAlert(alertData: Omit<AlertType, 'id'>) {
         title: alertData.title,
         description: alertData.description,
         date: new Date(alertData.date),
-        landslideId: alertData.landslideId,
-        monitoringAreaId: alertData.monitoringAreaId,
+        landslide_id: alertData.landslideId,
+        monitoring_area_id: alertData.monitoringAreaId,
         read: alertData.read,
-        userId: 'default',
-        createdAt: new Date()
+        user_id: 'default',
+        created_at: new Date()
       });
       
       console.log(`✅ Đã tạo cảnh báo mới: ${alertData.title}`);
