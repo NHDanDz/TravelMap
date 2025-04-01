@@ -11,17 +11,17 @@ import {
   NotificationSettings as NotificationSettingsType,
   Alert as AlertType
 } from '../types/landslide';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 
-// Cấu hình retry
+// Configuration for retries
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 300; // ms
 
-// Kiểm tra kiểu lỗi database
+// Check for database connection error types
 function isDatabaseConnectionError(error: unknown): boolean {
-  // Nếu là object
+  // If it's an object
   if (error && typeof error === 'object') {
-    // Kiểm tra code (ví dụ như ECONNRESET)
+    // Check for code (e.g., ECONNRESET)
     if ('code' in error && typeof (error as { code: string }).code === 'string') {
       const errorCode = (error as { code: string }).code;
       if (errorCode === 'ECONNRESET') {
@@ -29,7 +29,7 @@ function isDatabaseConnectionError(error: unknown): boolean {
       }
     }
     
-    // Kiểm tra message
+    // Check for message
     if ('message' in error && typeof (error as { message: string }).message === 'string') {
       const errorMessage = (error as { message: string }).message.toLowerCase();
       return (
@@ -43,20 +43,20 @@ function isDatabaseConnectionError(error: unknown): boolean {
   return false;
 }
 
-// Hàm trợ giúp để retry các hàm gọi database khi gặp lỗi ECONNRESET
+// Helper function to retry database operations when encountering ECONNRESET errors
 async function withRetry<T>(operation: () => Promise<T>, retries = MAX_RETRIES, delay = INITIAL_RETRY_DELAY): Promise<T> {
   try {
     return await operation();
   } catch (error: unknown) {
-    console.error(`Lỗi database (còn ${retries} lần thử lại):`, error);
+    console.error(`Database error (${retries} retries left):`, error);
     
     if (retries <= 0) {
       throw error;
     }
     
-    // Kiểm tra nếu là lỗi kết nối (ECONNRESET, socket hang up, timeout...)
+    // Check if it's a connection error (ECONNRESET, socket hang up, timeout...)
     if (isDatabaseConnectionError(error)) {
-      console.log(`⏱️ Chờ ${delay}ms trước khi thử lại...`);
+      console.log(`⏱️ Waiting ${delay}ms before retrying...`);
       await new Promise(resolve => setTimeout(resolve, delay));
       return withRetry(operation, retries - 1, delay * 1.5);
     }
@@ -84,7 +84,7 @@ const sampleLandslides: LandslidePoint[] = [
       { date: '2025-03-15', status: 'monitored', note: 'Tăng diện tích ảnh hưởng 15%' }
     ]
   },
-  // Các mẫu khác...
+  // Additional samples...
 ];
 
 const sampleMonitoredAreas: MonitoringArea[] = [
@@ -99,7 +99,7 @@ const sampleMonitoredAreas: MonitoringArea[] = [
     detectedPoints: 2,
     riskLevel: 'high'
   },
-  // Các mẫu khác...
+  // Additional samples...
 ];
 
 const sampleAlerts: AlertType[] = [
@@ -112,7 +112,7 @@ const sampleAlerts: AlertType[] = [
     landslideId: 'LS003',
     read: false
   },
-  // Các mẫu khác...
+  // Additional samples...
 ];
 
 const sampleNotificationSettings: NotificationSettingsType = {
@@ -127,7 +127,7 @@ const sampleNotificationSettings: NotificationSettingsType = {
   monthlyReport: true
 };
 
-// Chuyển đổi đối tượng LandslidePoint thành định dạng database
+// Convert LandslidePoint object to database format
 function convertLandslideToDBFormat(landslide: LandslidePoint) {
   return {
     id: landslide.id,
@@ -145,7 +145,7 @@ function convertLandslideToDBFormat(landslide: LandslidePoint) {
   };
 }
 
-// Chuyển đổi từ định dạng database sang LandslidePoint
+// Convert from database format to LandslidePoint
 function convertDBToLandslideFormat(dbLandslide: any): LandslidePoint {
   let parsedHistory;
   try {
@@ -157,6 +157,7 @@ function convertDBToLandslideFormat(dbLandslide: any): LandslidePoint {
     parsedHistory = [];
   }
   
+  // Handle column name discrepancies between schema and actual DB
   return {
     id: dbLandslide.id,
     name: dbLandslide.name,
@@ -164,18 +165,23 @@ function convertDBToLandslideFormat(dbLandslide: any): LandslidePoint {
       lat: parseFloat(dbLandslide.lat),
       lng: parseFloat(dbLandslide.lng)
     },
-    detectedAt: dbLandslide.first_detected_at?.toISOString() || dbLandslide.detectedAt?.toISOString(),
+    // Handle column name differences: first_detected_at vs detected_at
+    detectedAt: dbLandslide.first_detected_at?.toISOString() || 
+                dbLandslide.detected_at?.toISOString() || 
+                new Date().toISOString(),
     status: dbLandslide.status,
     details: {
       affectedArea: dbLandslide.affected_area || dbLandslide.affectedArea || '',
       potentialImpact: dbLandslide.potential_impact || dbLandslide.potentialImpact || '',
-      lastUpdate: dbLandslide.last_update?.toISOString() || dbLandslide.lastUpdate?.toISOString()
+      lastUpdate: dbLandslide.last_update?.toISOString() || 
+                  dbLandslide.lastUpdate?.toISOString() || 
+                  new Date().toISOString()
     },
     history: parsedHistory
   };
 }
 
-// Chuyển đổi đối tượng MonitoringArea thành định dạng database
+// Convert MonitoringArea object to database format
 function convertMonitoringAreaToDBFormat(area: MonitoringArea) {
   return {
     id: area.id,
@@ -195,7 +201,7 @@ function convertMonitoringAreaToDBFormat(area: MonitoringArea) {
   };
 }
 
-// Chuyển đổi từ định dạng database sang MonitoringArea
+// Convert from database format to MonitoringArea
 function convertDBToMonitoringAreaFormat(dbArea: any): MonitoringArea {
   return {
     id: dbArea.id,
@@ -221,30 +227,30 @@ function convertDBToMonitoringAreaFormat(dbArea: any): MonitoringArea {
 const isMockDb = () => {
   const usingMockDb = !process.env.POSTGRES_URL;
   if (usingMockDb) {
-    console.log('💬 Sử dụng cơ sở dữ liệu giả lập');
+    console.log('💬 Using mock database');
   }
   return usingMockDb;
 };
 
-// Tạo/cập nhật một điểm sạt lở
+// Create/update a landslide point
 export async function saveLandslide(landslideData: LandslidePoint) {
-  console.log(`🔄 Lưu thông tin sạt lở: ${landslideData.name} (${landslideData.id})`);
+  console.log(`🔄 Saving landslide information: ${landslideData.name} (${landslideData.id})`);
   
   try {
     if (isMockDb()) {
-      console.log('✅ Giả lập lưu thành công');
+      console.log('✅ Mock save successful');
       return { success: true };
     }
     
     const dbLandslide = convertLandslideToDBFormat(landslideData);
     
     return await withRetry(async () => {
-      // Kiểm tra xem điểm sạt lở đã tồn tại chưa
+      // Check if the landslide point already exists
       const existingLandslide = await db.select().from(landslides).where(eq(landslides.id, landslideData.id));
       
       if (existingLandslide.length > 0) {
-        console.log(`📝 Cập nhật điểm sạt lở: ${landslideData.name}`);
-        // Cập nhật nếu đã tồn tại
+        console.log(`📝 Updating landslide point: ${landslideData.name}`);
+        // Update if it already exists
         await db.update(landslides)
           .set({ 
             ...dbLandslide,
@@ -252,11 +258,11 @@ export async function saveLandslide(landslideData: LandslidePoint) {
           })
           .where(eq(landslides.id, landslideData.id));
       } else {
-        console.log(`➕ Thêm điểm sạt lở mới: ${landslideData.name}`);
-        // Thêm mới nếu chưa tồn tại
+        console.log(`➕ Adding new landslide point: ${landslideData.name}`);
+        // Add new if it doesn't exist
         await db.insert(landslides).values(dbLandslide);
         
-        // Tạo cảnh báo cho sạt lở mới
+        // Create an alert for the new landslide
         await db.insert(alerts).values({
           type: 'danger',
           title: 'Cảnh báo sạt lở mới',
@@ -270,46 +276,46 @@ export async function saveLandslide(landslideData: LandslidePoint) {
       }
       
       revalidatePath('/dashboard/landslides');
-      console.log('✅ Lưu thành công');
+      console.log('✅ Save successful');
       return { success: true };
     });
   } catch (error: unknown) {
-    console.error('❌ Lỗi khi lưu thông tin sạt lở:', error);
+    console.error('❌ Error saving landslide information:', error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
-// Lấy tất cả các điểm sạt lở
+// Get all landslide points
 export async function getAllLandslides() {
-  console.log('🔄 Đang lấy danh sách điểm sạt lở');
+  console.log('🔄 Retrieving landslide list');
   
   try {
     if (isMockDb()) {
-      console.log(`✅ Trả về ${sampleLandslides.length} điểm sạt lở mẫu`);
+      console.log(`✅ Returning ${sampleLandslides.length} sample landslide points`);
       return sampleLandslides;
     }
     
     return await withRetry(async () => {
       const dbLandslides = await db.select().from(landslides);
       const result = dbLandslides.map(convertDBToLandslideFormat);
-      console.log(`✅ Đã lấy ${result.length} điểm sạt lở từ database`);
+      console.log(`✅ Retrieved ${result.length} landslide points from database`);
       return result;
     });
   } catch (error: unknown) {
-    console.error('❌ Lỗi khi lấy danh sách điểm sạt lở:', error);
-    console.log(`⚠️ Trả về dữ liệu mẫu do lỗi: ${sampleLandslides.length} điểm`);
+    console.error('❌ Error retrieving landslide list:', error);
+    console.log(`⚠️ Returning sample data due to error: ${sampleLandslides.length} points`);
     return sampleLandslides; 
   }
 }
 
-// Lấy một điểm sạt lở theo ID
+// Get a landslide point by ID
 export async function getLandslideById(id: string) {
-  console.log(`🔄 Đang lấy thông tin điểm sạt lở ID: ${id}`);
+  console.log(`🔄 Retrieving landslide point info ID: ${id}`);
   
   try {
     if (isMockDb()) {
       const mockLandslide = sampleLandslides.find(l => l.id === id);
-      console.log(mockLandslide ? '✅ Đã tìm thấy trong dữ liệu mẫu' : '⚠️ Không tìm thấy trong dữ liệu mẫu');
+      console.log(mockLandslide ? '✅ Found in sample data' : '⚠️ Not found in sample data');
       return mockLandslide || null;
     }
     
@@ -317,79 +323,79 @@ export async function getLandslideById(id: string) {
       const dbLandslide = await db.select().from(landslides).where(eq(landslides.id, id));
       
       if (dbLandslide.length === 0) {
-        console.log(`⚠️ Không tìm thấy điểm sạt lở ID: ${id}`);
+        console.log(`⚠️ Landslide point not found ID: ${id}`);
         return null;
       }
       
-      console.log(`✅ Đã tìm thấy điểm sạt lở ID: ${id}`);
+      console.log(`✅ Found landslide point ID: ${id}`);
       return convertDBToLandslideFormat(dbLandslide[0]);
     });
   } catch (error: unknown) {
-    console.error(`❌ Lỗi khi lấy thông tin điểm sạt lở ID: ${id}:`, error);
+    console.error(`❌ Error retrieving landslide point info ID: ${id}:`, error);
     return null;
   }
 }
 
-// Xóa một điểm sạt lở
+// Delete a landslide point
 export async function deleteLandslide(id: string) {
-  console.log(`🔄 Đang xóa điểm sạt lở ID: ${id}`);
+  console.log(`🔄 Deleting landslide point ID: ${id}`);
   
   try {
     if (isMockDb()) {
-      console.log('✅ Giả lập xóa thành công');
+      console.log('✅ Mock delete successful');
       return { success: true };
     }
     
     return await withRetry(async () => {
-      // Xóa các cảnh báo liên quan
+      // Delete related alerts first
       await db.delete(alerts).where(eq(alerts.landslideId, id));
-      console.log(`🗑️ Đã xóa các cảnh báo liên quan đến điểm sạt lở ID: ${id}`);
+      console.log(`🗑️ Deleted alerts related to landslide point ID: ${id}`);
       
-      // Xóa điểm sạt lở
+      // Delete the landslide point
       await db.delete(landslides).where(eq(landslides.id, id));
-      console.log(`✅ Đã xóa điểm sạt lở ID: ${id}`);
+      console.log(`✅ Deleted landslide point ID: ${id}`);
       
       revalidatePath('/dashboard/landslides');
       return { success: true };
     });
   } catch (error: unknown) {
-    console.error(`❌ Lỗi khi xóa điểm sạt lở ID: ${id}:`, error);
+    console.error(`❌ Error deleting landslide point ID: ${id}:`, error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
-// Lưu/cập nhật khu vực theo dõi
+// Save/update monitoring area
 export async function saveMonitoringArea(areaData: MonitoringArea) {
-  console.log(`🔄 Lưu khu vực theo dõi: ${areaData.name} (${areaData.id})`);
+  console.log(`🔄 Saving monitoring area: ${areaData.name} (${areaData.id})`);
   
   try {
     if (isMockDb()) {
-      console.log('✅ Giả lập lưu thành công');
+      console.log('✅ Mock save successful');
       return { success: true };
     }
     
     const dbArea = convertMonitoringAreaToDBFormat(areaData);
     
     return await withRetry(async () => {
-      // Kiểm tra xem khu vực đã tồn tại chưa
+      // Check if the area already exists
       const existingArea = await db.select().from(monitoringAreas).where(eq(monitoringAreas.id, areaData.id));
       
       if (existingArea.length > 0) {
-        console.log(`📝 Cập nhật khu vực theo dõi: ${areaData.name}`);
-        // Cập nhật nếu đã tồn tại
+        console.log(`📝 Updating monitoring area: ${areaData.name}`);
+        // Update if it already exists
         await db.update(monitoringAreas)
           .set(dbArea)
           .where(eq(monitoringAreas.id, areaData.id));
       } else {
-        console.log(`➕ Thêm khu vực theo dõi mới: ${areaData.name}`);
-        // Thêm mới nếu chưa tồn tại
+        console.log(`➕ Adding new monitoring area: ${areaData.name}`);
+        // Add new if it doesn't exist
         await db.insert(monitoringAreas).values(dbArea);
         
-        // Tạo cảnh báo cho khu vực theo dõi mới
+        // Create an alert for the new monitoring area
         await db.insert(alerts).values({
           type: 'info',
-          title: 'Khu vực mới được giám sát',
-          description: `Khu vực ${areaData.name} (${areaData.id}) đã được thêm vào danh sách theo dõi liên tục.`,
+          title: 'New area being monitored',
+          description: `Area ${areaData.name} (${areaData.id}) has been added to the continuous monitoring list.`,
           date: new Date(),
           monitoring_area_id: areaData.id,
           read: false,
@@ -399,105 +405,105 @@ export async function saveMonitoringArea(areaData: MonitoringArea) {
       }
       
       revalidatePath('/dashboard/landslides');
-      console.log('✅ Lưu thành công');
+      console.log('✅ Save successful');
       return { success: true };
     });
   } catch (error: unknown) {
-    console.error('❌ Lỗi khi lưu khu vực theo dõi:', error);
+    console.error('❌ Error saving monitoring area:', error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
-// Lấy tất cả các khu vực theo dõi
+// Get all monitoring areas
 export async function getAllMonitoringAreas() {
-  console.log('🔄 Đang lấy danh sách khu vực theo dõi');
+  console.log('🔄 Retrieving monitoring area list');
   
   try {
     if (isMockDb()) {
-      console.log(`✅ Trả về ${sampleMonitoredAreas.length} khu vực theo dõi mẫu`);
+      console.log(`✅ Returning ${sampleMonitoredAreas.length} sample monitoring areas`);
       return sampleMonitoredAreas;
     }
     
     return await withRetry(async () => {
       const dbAreas = await db.select().from(monitoringAreas);
       const result = dbAreas.map(convertDBToMonitoringAreaFormat);
-      console.log(`✅ Đã lấy ${result.length} khu vực theo dõi từ database`);
+      console.log(`✅ Retrieved ${result.length} monitoring areas from database`);
       return result;
     });
   } catch (error: unknown) {
-    console.error('❌ Lỗi khi lấy danh sách khu vực theo dõi:', error);
-    console.log(`⚠️ Trả về dữ liệu mẫu do lỗi: ${sampleMonitoredAreas.length} khu vực`);
+    console.error('❌ Error retrieving monitoring area list:', error);
+    console.log(`⚠️ Returning sample data due to error: ${sampleMonitoredAreas.length} areas`);
     return sampleMonitoredAreas;
   }
 }
 
-// Lưu/cập nhật cài đặt thông báo
+// Save/update notification settings
 export async function saveNotificationSettings(settings: NotificationSettingsType, userId: string = 'default') {
-  console.log(`🔄 Lưu cài đặt thông báo cho người dùng: ${userId}`);
+  console.log(`🔄 Saving notification settings for user: ${userId}`);
   
   try {
     if (isMockDb()) {
-      console.log('✅ Giả lập lưu thành công');
+      console.log('✅ Mock save successful');
       return { success: true };
     }
     
     return await withRetry(async () => {
-      // Kiểm tra xem cài đặt đã tồn tại chưa
+      // Check if settings already exist
       const existingSettings = await db.select().from(notificationSettings).where(eq(notificationSettings.userId, userId));
       
       if (existingSettings.length > 0) {
-        console.log(`📝 Cập nhật cài đặt thông báo cho người dùng: ${userId}`);
-        // Cập nhật nếu đã tồn tại
+        console.log(`📝 Updating notification settings for user: ${userId}`);
+        // Update if they already exist
         await db.update(notificationSettings)
           .set({
             email: settings.email,
-            emailAddress: settings.emailAddress, // Giữ camelCase
+            emailAddress: settings.emailAddress, 
             sms: settings.sms,
-            phoneNumber: settings.phoneNumber, // Giữ camelCase
+            phoneNumber: settings.phoneNumber, 
             threshold: settings.threshold,
-            updateFrequency: settings.updateFrequency, // Giữ camelCase
-            weatherForecast: settings.weatherForecast, // Giữ camelCase
-            autoMonitor: settings.autoMonitor, // Giữ camelCase
-            monthlyReport: settings.monthlyReport, // Giữ camelCase
-            updatedAt: new Date() // Giữ camelCase
+            updateFrequency: settings.updateFrequency, 
+            weatherForecast: settings.weatherForecast, 
+            autoMonitor: settings.autoMonitor, 
+            monthlyReport: settings.monthlyReport, 
+            updatedAt: new Date() 
           })
-          .where(eq(notificationSettings.userId, userId)); // Sửa user_id thành userId
+          .where(eq(notificationSettings.userId, userId)); 
       } else {
-        console.log(`➕ Thêm cài đặt thông báo mới cho người dùng: ${userId}`);
-        // Thêm mới nếu chưa tồn tại
+        console.log(`➕ Adding new notification settings for user: ${userId}`);
+        // Add new if they don't exist
         await db.insert(notificationSettings).values({
-          userId, // Giữ camelCase
+          userId, 
           email: settings.email,
-          emailAddress: settings.emailAddress, // Giữ camelCase
+          emailAddress: settings.emailAddress, 
           sms: settings.sms,
-          phoneNumber: settings.phoneNumber, // Giữ camelCase
+          phoneNumber: settings.phoneNumber, 
           threshold: settings.threshold,
-          updateFrequency: settings.updateFrequency, // Giữ camelCase
-          weatherForecast: settings.weatherForecast, // Giữ camelCase
-          autoMonitor: settings.autoMonitor, // Giữ camelCase
-          monthlyReport: settings.monthlyReport, // Giữ camelCase
-          createdAt: new Date(), // Giữ camelCase
-          updatedAt: new Date() // Giữ camelCase
+          updateFrequency: settings.updateFrequency, 
+          weatherForecast: settings.weatherForecast, 
+          autoMonitor: settings.autoMonitor, 
+          monthlyReport: settings.monthlyReport, 
+          createdAt: new Date(), 
+          updatedAt: new Date() 
         });
       }
       
       revalidatePath('/dashboard/landslides');
-      console.log('✅ Lưu thành công');
+      console.log('✅ Save successful');
       return { success: true };
     });
   } catch (error: unknown) {
-    console.error('❌ Lỗi khi lưu cài đặt thông báo:', error);
+    console.error('❌ Error saving notification settings:', error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
-// Lấy cài đặt thông báo của người dùng
+// Get notification settings for a user
 export async function getNotificationSettings(userId: string = 'default') {
-  console.log(`🔄 Đang lấy cài đặt thông báo cho người dùng: ${userId}`);
+  console.log(`🔄 Retrieving notification settings for user: ${userId}`);
   
   try {
     if (isMockDb()) {
-      console.log('✅ Trả về cài đặt thông báo mẫu');
+      console.log('✅ Returning sample notification settings');
       return sampleNotificationSettings;
     }
     
@@ -505,11 +511,11 @@ export async function getNotificationSettings(userId: string = 'default') {
       const dbSettings = await db.select().from(notificationSettings).where(eq(notificationSettings.userId, userId));
       
       if (dbSettings.length === 0) {
-        console.log(`⚠️ Không tìm thấy cài đặt thông báo cho người dùng: ${userId}, trả về mặc định`);
+        console.log(`⚠️ Notification settings not found for user: ${userId}, returning defaults`);
         return sampleNotificationSettings;
       }
       
-      console.log(`✅ Đã lấy cài đặt thông báo cho người dùng: ${userId}`);
+      console.log(`✅ Retrieved notification settings for user: ${userId}`);
       const settings = dbSettings[0];
       
       return {
@@ -525,19 +531,19 @@ export async function getNotificationSettings(userId: string = 'default') {
       } as NotificationSettingsType;
     });
   } catch (error: unknown) {
-    console.error('❌ Lỗi khi lấy cài đặt thông báo:', error);
-    console.log('⚠️ Trả về cài đặt thông báo mẫu do lỗi');
+    console.error('❌ Error retrieving notification settings:', error);
+    console.log('⚠️ Returning sample notification settings due to error');
     return sampleNotificationSettings;
   }
 }
 
-// Lấy tất cả các cảnh báo
+// Get all alerts
 export async function getAllAlerts(userId: string = 'default') {
-  console.log(`🔄 Đang lấy danh sách cảnh báo cho người dùng: ${userId}`);
+  console.log(`🔄 Retrieving alert list for user: ${userId}`);
   
   try {
     if (isMockDb()) {
-      console.log(`✅ Trả về ${sampleAlerts.length} cảnh báo mẫu`);
+      console.log(`✅ Returning ${sampleAlerts.length} sample alerts`);
       return sampleAlerts;
     }
     
@@ -557,48 +563,56 @@ export async function getAllAlerts(userId: string = 'default') {
         read: alert.read
       })) as AlertType[];
       
-      console.log(`✅ Đã lấy ${result.length} cảnh báo từ database`);
+      console.log(`✅ Retrieved ${result.length} alerts from database`);
       return result;
     });
   } catch (error: unknown) {
-    console.error('❌ Lỗi khi lấy danh sách cảnh báo:', error);
-    console.log(`⚠️ Trả về dữ liệu mẫu do lỗi: ${sampleAlerts.length} cảnh báo`);
+    console.error('❌ Error retrieving alert list:', error);
+    console.log(`⚠️ Returning sample data due to error: ${sampleAlerts.length} alerts`);
     return sampleAlerts;
   }
 }
 
-// Đánh dấu cảnh báo đã đọc
+// Mark an alert as read
 export async function markAlertAsRead(alertId: string) {
-  console.log(`🔄 Đánh dấu đã đọc cảnh báo ID: ${alertId}`);
+  console.log(`🔄 Marking alert as read ID: ${alertId}`);
   
   try {
     if (isMockDb()) {
-      console.log('✅ Giả lập đánh dấu thành công');
+      console.log('✅ Mock mark as read successful');
       return { success: true };
     }
     
     return await withRetry(async () => {
+      // Convert alertId to number since it's a serial in the database
+      const numericAlertId = parseInt(alertId, 10);
+      
+      // Check if conversion was successful
+      if (isNaN(numericAlertId)) {
+        throw new Error(`Invalid alert ID format: ${alertId}`);
+      }
+      
       await db.update(alerts)
         .set({ read: true })
-        .where(eq(alerts.id, alertId));
+        .where(eq(alerts.id, numericAlertId));
       
-      console.log(`✅ Đã đánh dấu đã đọc cảnh báo ID: ${alertId}`);
+      console.log(`✅ Marked alert as read ID: ${alertId}`);
       revalidatePath('/dashboard/landslides');
       return { success: true };
     });
   } catch (error) {
-    console.error(`❌ Lỗi khi đánh dấu đã đọc cảnh báo ID: ${alertId}:`, error);
+    console.error(`❌ Error marking alert as read ID: ${alertId}:`, error);
     return { success: false, error };
   }
 }
 
-// Tạo một cảnh báo mới
+// Create a new alert
 export async function createAlert(alertData: Omit<AlertType, 'id'>) {
-  console.log(`🔄 Tạo cảnh báo mới: ${alertData.title}`);
+  console.log(`🔄 Creating new alert: ${alertData.title}`);
   
   try {
     if (isMockDb()) {
-      console.log('✅ Giả lập tạo thành công');
+      console.log('✅ Mock create successful');
       return { success: true };
     }
     
@@ -615,12 +629,12 @@ export async function createAlert(alertData: Omit<AlertType, 'id'>) {
         created_at: new Date()
       });
       
-      console.log(`✅ Đã tạo cảnh báo mới: ${alertData.title}`);
+      console.log(`✅ Created new alert: ${alertData.title}`);
       revalidatePath('/dashboard/landslides');
       return { success: true };
     });
   } catch (error) {
-    console.error('❌ Lỗi khi tạo cảnh báo:', error);
+    console.error('❌ Error creating alert:', error);
     return { success: false, error };
   }
 }

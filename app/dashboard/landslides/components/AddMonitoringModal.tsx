@@ -11,13 +11,19 @@ interface AddMonitoringModalProps {
 }
 
 // Helper function to format date
-function formatDate(dateString: string, locale: string = 'vi-VN'): string {
-  const date = new Date(dateString);
-  return new Intl.DateTimeFormat(locale, {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  }).format(date);
+function formatDate(dateString: string | undefined, locale: string = 'vi-VN'): string {
+  try {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat(locale, {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).format(date);
+  } catch (error) {
+    console.error("Lỗi khi định dạng ngày:", error);
+    return dateString || 'N/A';
+  }
 }
 
 export default function AddMonitoringModal({ landslide, onClose, onAddMonitoring }: AddMonitoringModalProps) {
@@ -30,6 +36,7 @@ export default function AddMonitoringModal({ landslide, onClose, onAddMonitoring
   };
 
   const [name, setName] = useState(`${landslide.name} - Monitoring Area`);
+  const [description, setDescription] = useState(`Khu vực theo dõi sạt lở ${landslide.name}`);
   const [monitorFrequency, setMonitorFrequency] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly'>('daily');
   const [autoVerify, setAutoVerify] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -41,7 +48,7 @@ export default function AddMonitoringModal({ landslide, onClose, onAddMonitoring
 
     try {
       await onAddMonitoring({
-        name,
+        name, 
         boundingBox,
         monitorFrequency,
         autoVerify,
@@ -95,6 +102,19 @@ export default function AddMonitoringModal({ landslide, onClose, onAddMonitoring
               onChange={(e) => setName(e.target.value)}
               className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
               required
+            />
+          </div>
+
+          <div className="mb-4">
+            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+              Mô tả
+            </label>
+            <textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+              rows={2}
             />
           </div>
 

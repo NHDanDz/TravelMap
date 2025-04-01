@@ -11,21 +11,15 @@ interface LandslideDetailProps {
 }
 
 // Helper function to format date
-function formatDate(dateString: string | undefined, locale: string = 'vi-VN'): string {
-  try {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat(locale, {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
-  } catch (error) {
-    console.error("Lỗi khi định dạng ngày:", error);
-    return dateString || 'N/A';
-  }
+function formatDate(dateString: string, locale: string = 'vi-VN'): string {
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat(locale, {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date);
 }
 
 // Function to generate satellite image URL
@@ -51,12 +45,6 @@ export default function LandslideDetail({ landslide, onClose, onAddToMonitoring 
     setImageLoaded(false);
     setImageError(false);
   }, [landslide.id]);
-  
-  // Đảm bảo dữ liệu hợp lệ
-  const history = landslide.history || [];
-  const affectedArea = landslide.details?.affectedArea || 'N/A';
-  const potentialImpact = landslide.details?.potentialImpact || 'N/A';
-  const lastUpdate = landslide.details?.lastUpdate || landslide.detectedAt || new Date().toISOString();
   
   // Generate the satellite image URL
   const satelliteImageUrl = getSatelliteImageUrl(
@@ -119,7 +107,7 @@ export default function LandslideDetail({ landslide, onClose, onAddToMonitoring 
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <h3 className="text-lg font-medium text-gray-900 mb-3">Lịch sử hoạt động</h3>
               <div className="space-y-4">
-                {history.map((event, index) => (
+                {landslide.history.map((event, index) => (
                   <div key={index} className="relative pl-8">
                     <div className="absolute left-0 top-0 h-full">
                       <div className="w-1 h-full bg-gray-200"></div>
@@ -133,7 +121,7 @@ export default function LandslideDetail({ landslide, onClose, onAddToMonitoring 
                   </div>
                 ))}
                 
-                {history.length === 0 && (
+                {landslide.history.length === 0 && (
                   <p className="text-gray-500 text-sm">Chưa có dữ liệu lịch sử.</p>
                 )}
               </div>
@@ -160,15 +148,15 @@ export default function LandslideDetail({ landslide, onClose, onAddToMonitoring 
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Diện tích khu vực</p>
-                  <p className="font-medium">{affectedArea}</p>
+                  <p className="font-medium">{landslide.details.affectedArea}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Tác động tiềm tàng</p>
-                  <p className="font-medium">{potentialImpact}</p>
+                  <p className="font-medium">{landslide.details.potentialImpact}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Cập nhật gần nhất</p>
-                  <p className="font-medium">{formatDate(lastUpdate)}</p>
+                  <p className="font-medium">{formatDate(landslide.details.lastUpdate)}</p>
                 </div>
               </div>
             </div>
@@ -222,10 +210,6 @@ function getStatusLabel(status: string): string {
     case 'detected': return 'Phát hiện ban đầu';
     case 'field_verified': return 'Xác minh tại hiện trường';
     case 'monitored': return 'Đang theo dõi';
-    case 'high_risk': return 'Nguy cơ cao';
-    case 'active': return 'Đang hoạt động';
-    case 'stabilized': return 'Đã ổn định';
-    case 'remediated': return 'Đã xử lý';
     default: return status;
   }
 }
