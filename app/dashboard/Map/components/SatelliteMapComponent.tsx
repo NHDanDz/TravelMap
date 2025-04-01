@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup, Rectangle, useMapEvents, useMap
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import LandslideMarkerLayer from './LandslideMarkerLayer'; 
+import LandslideConfirmationForm from './LandslideConfirmationForm';
 
 // Định nghĩa các kiểu dữ liệu
 interface LandslideCoordinate {
@@ -34,6 +35,10 @@ interface LocationMarkerProps {
   initialSearchProcessed: boolean;
   searchCounter: number;
   viewMode: 'normal' | 'landslide';
+  showConfirmDialog: boolean;
+  setShowConfirmDialog: (show: boolean) => void;
+  clickedPosition: L.LatLng | null;
+  setClickedPosition: (position: L.LatLng | null) => void;
 }
 
 interface MapCenterControlProps {
@@ -47,6 +52,7 @@ interface SatelliteMapComponentProps {
   goToCoords?: { lat: number; lng: number } | null;
   detectionMode?: boolean;
   fullscreen?: boolean;
+  showSearchConfirmation?: boolean; // Thêm prop mới này
 }
 
 // Custom icon configuration
@@ -96,12 +102,14 @@ function LocationMarker({
   searchPosition,
   initialSearchProcessed,
   searchCounter,
-  viewMode
+  viewMode,
+  showConfirmDialog,
+  setShowConfirmDialog,
+  clickedPosition,
+  setClickedPosition
 }: LocationMarkerProps) {
   const [position, setPosition] = useState<L.LatLng | null>(null);
   const [bounds, setBounds] = useState<L.LatLngBounds | null>(null);
-  const [showConfirmDialog, setShowConfirmDialog] = useState<boolean>(false);
-  const [clickedPosition, setClickedPosition] = useState<L.LatLng | null>(null);
   
   // Update position when search coordinates change and it's the initial search
   useEffect(() => {
@@ -198,68 +206,26 @@ function LocationMarker({
         )}
       </>
     )}
-
-      
-      {/* Hộp thoại xác nhận - chỉ hiển thị ở chế độ normal */}
-      {showConfirmDialog && clickedPosition && viewMode === 'normal' && (
-        <div className="confirm-landslide-dialog absolute top-16 right-4 bg-white p-4 rounded-lg shadow-lg z-[9999] max-w-sm">
-          <h3 className="font-bold text-lg mb-2">Phát hiện sạt lở đất</h3>
-          <p className="text-sm mb-3">Phân tích khu vực này để tìm kiếm sạt lở đất?</p>
-          
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Chọn mốc thời gian:</label>
-            <input 
-              type="date" 
-              id="event-date" 
-              className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
-              defaultValue={new Date().toISOString().split('T')[0]} 
-            />
-          </div>
-          
-          <div className="text-sm mb-3">
-            <p>Kinh độ: {clickedPosition.lng.toFixed(6)}</p>
-            <p>Vĩ độ: {clickedPosition.lat.toFixed(6)}</p>
-          </div>
-          
-          <div className="flex justify-between">
-            <button 
-              className="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded"
-              onClick={() => setShowConfirmDialog(false)}
-            >
-              Hủy
-            </button>
-            <button 
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded"
-              onClick={() => {
-                // Lấy giá trị ngày từ input
-                const dateInput = document.getElementById('event-date') as HTMLInputElement;
-                const eventDate = dateInput?.value || new Date().toISOString().split('T')[0];
-                
-                // Gọi hàm gửi dữ liệu
-                window.dispatchEvent(new CustomEvent('send-landslide-data', {
-                  detail: {
-                    lat: clickedPosition.lat,
-                    lng: clickedPosition.lng,
-                    eventDate: eventDate
-                  }
-                }));
-                
-                setShowConfirmDialog(false);
-              }}
-            >
-              Phân tích
-            </button>
-          </div>
-        </div>
-      )}
     </>
   );
+}
+
+// Component để lấy tham chiếu đến map
+function MapReference({ onMapReady }: { onMapReady: (map: L.Map) => void }) {
+  const map = useMap();
+  
+  useEffect(() => {
+    onMapReady(map);
+  }, [map, onMapReady]);
+  
+  return null;
 }
 
 export default function SatelliteMapComponent({ 
   goToCoords = null,
   detectionMode = false,
-  fullscreen = false
+  fullscreen = false,
+  showSearchConfirmation = false // Thêm prop mới với giá trị mặc định
 }: SatelliteMapComponentProps) {
   const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -278,6 +244,26 @@ export default function SatelliteMapComponent({
   const currentPollingId = useRef<string | null>(null);
   const pollingCleanupFunction = useRef<(() => void) | null>(null);
 
+  // Nâng state từ LocationMarker lên component cha
+  const [showConfirmDialog, setShowConfirmDialog] = useState<boolean>(false);
+  const [clickedPosition, setClickedPosition] = useState<L.LatLng | null>(null);
+
+  // Thêm state để quản lý form xác nhận sạt lở
+  // Thêm state để lưu tọa độ đã gửi lên API
+  const [sentCoordinates, setSentCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+
+  const [showConfirmationForm, setShowConfirmationForm] = useState<boolean>(false);
+  const [selectedLandslideCoord, setSelectedLandslideCoord] = useState<{ lat: number; lng: number } | null>(null);
+  const [landslideImage, setLandslideImage] = useState<string | null>(null);
+
+  // Tham chiếu đến đối tượng map
+  const mapRef = useRef<L.Map | null>(null);
+
+  // Hàm để lấy tham chiếu đến Leaflet map
+  const setMapRef = useCallback((map: L.Map) => {
+    mapRef.current = map;
+  }, []);
+
   // Fix for Leaflet icons in Next.js
   useEffect(() => {
     // Set default marker icon
@@ -294,9 +280,119 @@ export default function SatelliteMapComponent({
     }
   }, [goToCoords]);
 
+  // Thêm useEffect mới để xử lý khi goToCoords thay đổi và showSearchConfirmation là true
+  useEffect(() => {
+    if (goToCoords && showSearchConfirmation && viewMode === 'normal') {
+      // Tạo vị trí tương ứng và hiển thị hộp thoại xác nhận
+      const newPosition = new L.LatLng(goToCoords.lat, goToCoords.lng);
+      setClickedPosition(newPosition);
+      setShowConfirmDialog(true);
+    }
+  }, [goToCoords, showSearchConfirmation, viewMode]);
+
   const handleLocationSelect = useCallback((lat: number, lng: number) => {
     console.log('Vị trí đã chọn:', { lat, lng });
   }, []);
+  
+  // Hàm xử lý khi người dùng xác nhận điểm sạt lở
+  const handleLandslideConfirmation = async (landslideData: any) => {
+    try {
+      setSendStatus({ status: 'sending', message: 'Đang lưu thông tin điểm sạt lở...' });
+      
+      // Gọi API endpoint để lưu điểm sạt lở đã xác nhận
+      const response = await fetch('/api/landslide-confirmation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...landslideData,
+          detectionResultId: landslideResults?.id || null,
+          originalCoordinates: landslideResults?.landslide_coordinates?.coordinates || []
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Lỗi khi lưu thông tin điểm sạt lở');
+      }
+
+      const result = await response.json();
+      console.log('Đã lưu điểm sạt lở:', result);
+      
+      setSendStatus({
+        status: 'success',
+        message: `Đã xác nhận và lưu điểm sạt lở: ${landslideData.name}`,
+      });
+      
+      // Đóng form xác nhận
+      setShowConfirmationForm(false);
+      
+      // Tự động ẩn thông báo sau 5 giây
+      setTimeout(() => {
+        setSendStatus({ status: 'idle' });
+      }, 5000);
+    } catch (error) {
+      console.error('Lỗi khi lưu điểm sạt lở:', error);
+      setSendStatus({
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Lỗi khi lưu thông tin điểm sạt lở',
+      });
+      
+      // Tự động ẩn thông báo lỗi sau 5 giây
+      setTimeout(() => {
+        setSendStatus({ status: 'idle' });
+      }, 5000);
+    }
+  };
+  
+  // Hàm chụp ảnh khu vực bản đồ đã chọn
+  const captureMapArea = useCallback(() => {
+    if (sentCoordinates && mapRef.current) {
+      try {
+        // Phương pháp 1: Tạo URL hình ảnh vệ tinh mẫu dựa trên tọa độ
+        // Sử dụng chuyển đổi tọa độ từ bản đồ sang tọa độ vùng ảnh
+        
+        // Sử dụng ESRI World Imagery Static Map API - không cần token
+        // Đây là URL mẫu để lấy ảnh vệ tinh từ ESRI ArcGIS
+        const zoom = 15; // Mức zoom phù hợp
+        const width = 500;
+        const height = 300;
+        
+        // Tạo URL cho Esri World Imagery Static Map
+        return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${sentCoordinates.lng-0.01},${sentCoordinates.lat-0.01},${sentCoordinates.lng+0.01},${sentCoordinates.lat+0.01}&size=${width},${height}&format=png&f=image&bboxSR=4326&imageSR=4326`;
+        
+        // Phương pháp 2: Sử dụng html2canvas để chụp ảnh bản đồ (cần import thư viện)
+        // Trong trường hợp trên không hoạt động, có thể dùng phương pháp này
+        
+        // Phương pháp fallback: Sử dụng ảnh placeholder
+        // return `/images/satellite-placeholder.jpg`;
+      } catch (error) {
+        console.error("Lỗi khi chụp bản đồ:", error);
+        return `/images/satellite-placeholder.jpg`;
+      }
+    }
+    return `/images/satellite-placeholder.jpg`;
+  }, [sentCoordinates, mapRef]);
+
+  // Hàm để mở form xác nhận sạt lở với tọa độ gốc đã gửi lên API
+  const openConfirmationForm = useCallback(() => {
+    // Luôn ưu tiên sử dụng tọa độ đã gửi lên API
+    if (sentCoordinates) {
+      setSelectedLandslideCoord(sentCoordinates);
+      
+      // Thay vì gọi API không tồn tại, sử dụng hàm chụp ảnh khu vực
+      const imageUrl = captureMapArea();
+      setLandslideImage(imageUrl);
+      
+      setShowConfirmationForm(true);
+    } else {
+      console.error('Không có tọa độ gửi lên API');
+      setSendStatus({
+        status: 'error',
+        message: 'Không thể xác nhận: Thiếu thông tin tọa độ gốc',
+      });
+    }
+  }, [sentCoordinates, captureMapArea]);
   
   // Status polling function with improved request handling
   const startPollingStatus = useCallback((landslideId: string) => {
@@ -492,11 +588,14 @@ export default function SatelliteMapComponent({
       }
     };
   }, []);
-  
+
   // Send coordinates to API endpoint using Next.js API route
   const sendCoordinates = async (lat: number, lng: number, eventDate: string) => {
     try {
       setSendStatus({ status: 'sending' });
+      
+      // Lưu tọa độ đã gửi vào state để sử dụng sau này khi xác nhận sạt lở
+      setSentCoordinates({ lat, lng });
       
       // Create payload for GEE (X: longitude, Y: latitude)
       const payload = {
@@ -613,30 +712,32 @@ export default function SatelliteMapComponent({
   if (loading) {
     return <div className="w-full h-full bg-gray-100 animate-pulse" />;
   }
+
   const containerClass = fullscreen 
-  ? "w-full h-screen" 
-  : "w-full h-full min-h-[600px]";
+    ? "w-full h-screen relative" 
+    : "w-full h-full min-h-[600px] relative";
 
   return (
-    <div className={`w-full h-full ${fullscreen ? 'absolute inset-0' : 'relative'}`}>
-    <MapContainer
-      center={currentLocation || [21.0285, 105.8542]}
-      zoom={13}
-      scrollWheelZoom={true}
-      className="w-full h-full"
-      zoomControl={false} // Tắt zoom control mặc định
-      attributionControl={false} // Tắt attribution control mặc định
-    >
-      {/* Thêm controls cho zoom ở vị trí không bị che */}
-      <div className="leaflet-control-container">
-        <div className="leaflet-top leaflet-right" style={{ zIndex: 1000, marginTop: '10px', marginRight: '10px' }}>
-          <div className="leaflet-control-zoom leaflet-bar leaflet-control">
-            <a className="leaflet-control-zoom-in" href="#" title="Zoom in" role="button" aria-label="Zoom in">+</a>
-            <a className="leaflet-control-zoom-out" href="#" title="Zoom out" role="button" aria-label="Zoom out">−</a>
+    <div className={containerClass}>
+      <MapContainer
+        center={goToCoords ? [goToCoords.lat, goToCoords.lng] : currentLocation ? currentLocation : [21.0285, 105.8542]}
+        zoom={goToCoords ? 15 : 7}
+        style={{ height: '100%', width: '100%' }}
+        zoomControl={false}
+        ref={(map) => {
+          if (map) setMapRef(map);
+        }}
+      >
+        {/* Thêm controls cho zoom ở vị trí không bị che */}
+        <div className="leaflet-control-container">
+          <div className="leaflet-top leaflet-right" style={{ zIndex: 1000, marginTop: '10px', marginRight: '10px' }}>
+            <div className="leaflet-control-zoom leaflet-bar leaflet-control">
+              <a className="leaflet-control-zoom-in" href="#" title="Zoom in" role="button" aria-label="Zoom in">+</a>
+              <a className="leaflet-control-zoom-out" href="#" title="Zoom out" role="button" aria-label="Zoom out">−</a>
+            </div>
           </div>
         </div>
-      </div>
-      
+        
         {/* Use satellite map layer from Esri */}
         <TileLayer
           attribution='&copy; <a href="https://www.esri.com/en-us/home">Esri</a>'
@@ -656,6 +757,10 @@ export default function SatelliteMapComponent({
           initialSearchProcessed={initialSearchProcessed}
           searchCounter={searchCounter}
           viewMode={viewMode}
+          showConfirmDialog={showConfirmDialog}
+          setShowConfirmDialog={setShowConfirmDialog}
+          clickedPosition={clickedPosition}
+          setClickedPosition={setClickedPosition}
         />
         
         {/* Hiển thị các điểm lở đất nếu ở chế độ xem lở đất và có kết quả phân tích */}
@@ -666,6 +771,10 @@ export default function SatelliteMapComponent({
             autoFitBounds={true}
             centerLongitude={goToCoords?.lng || currentLocation?.[1] || 105.8542}
             centerLatitude={goToCoords?.lat || currentLocation?.[0] || 21.0285}
+            onMarkerClick={() => {
+              // Khi người dùng click vào marker, hiển thị form xác nhận dùng tọa độ gốc đã gửi lên API
+              openConfirmationForm();
+            }}
           />
         )}
         {/* Map center control component */}
@@ -675,13 +784,80 @@ export default function SatelliteMapComponent({
           setInitialSearchProcessed={setInitialSearchProcessed}
           searchCounter={searchCounter}
         />
+        
+        {/* Component để lấy tham chiếu đến map object */}
+        <MapReference onMapReady={setMapRef} />
       </MapContainer>
+
+      {/* Hộp thoại xác nhận - chỉ hiển thị ở chế độ normal */}
+      {showConfirmDialog && clickedPosition && viewMode === 'normal' && (
+        <div className="confirm-landslide-dialog absolute top-40 right-4 bg-white p-4 rounded-lg shadow-lg z-[9999] max-w-sm">
+          <h3 className="font-bold text-lg mb-2">Phát hiện sạt lở đất</h3>
+          <p className="text-sm mb-3">Phân tích khu vực này để tìm kiếm sạt lở đất?</p>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">Chọn mốc thời gian:</label>
+            <input 
+              type="date" 
+              id="event-date" 
+              className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
+              defaultValue={new Date().toISOString().split('T')[0]} 
+            />
+          </div>
+          
+          <div className="text-sm mb-3">
+            <p>Kinh độ: {clickedPosition.lng.toFixed(6)}</p>
+            <p>Vĩ độ: {clickedPosition.lat.toFixed(6)}</p>
+          </div>
+          
+          <div className="flex justify-between">
+            <button 
+              className="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded"
+              onClick={() => setShowConfirmDialog(false)}
+            >
+              Hủy
+            </button>
+            <button 
+              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded"
+              onClick={() => {
+                // Lấy giá trị ngày từ input
+                const dateInput = document.getElementById('event-date') as HTMLInputElement;
+                const eventDate = dateInput?.value || new Date().toISOString().split('T')[0];
+                
+                // Gọi hàm gửi dữ liệu
+                window.dispatchEvent(new CustomEvent('send-landslide-data', {
+                  detail: {
+                    lat: clickedPosition.lat,
+                    lng: clickedPosition.lng,
+                    eventDate: eventDate
+                  }
+                }));
+                
+                setShowConfirmDialog(false);
+              }}
+            >
+              Phân tích
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Form xác nhận sạt lở */}
+      {showConfirmationForm && selectedLandslideCoord && (
+        <LandslideConfirmationForm
+          isOpen={showConfirmationForm}
+          onClose={() => setShowConfirmationForm(false)}
+          onSubmit={handleLandslideConfirmation}
+          detectedCoordinates={selectedLandslideCoord}
+          detectedImage={landslideImage}
+        />
+      )}
 
       {/* Nút chuyển đổi chế độ xem */}
       {landslideResults?.landslideDetected && landslideResults.landslide_coordinates?.coordinates && (
-        <div className="absolute top-4 left-4 z-[1000]">
+        <div className="absolute top-4 left-4 z-[1000] space-y-2">
           <button 
-            className={`px-3 py-2 rounded-lg shadow-lg ${
+            className={`px-3 py-2 rounded-lg shadow-lg w-full ${
               viewMode === 'normal' 
                 ? 'bg-blue-500 text-white' 
                 : 'bg-white text-blue-500'
@@ -690,6 +866,19 @@ export default function SatelliteMapComponent({
           >
             {viewMode === 'normal' ? 'Xem điểm lở đất' : 'Chế độ thường'}
           </button>
+          
+          {/* Thêm nút để xác nhận điểm sạt lở */}
+          {viewMode === 'landslide' && (
+            <button 
+              className="px-3 py-2 rounded-lg shadow-lg bg-green-500 text-white w-full"
+              onClick={() => {
+                // Sử dụng tọa độ gốc đã gửi lên API để xác nhận sạt lở
+                openConfirmationForm();
+              }}
+            >
+              Xác nhận sạt lở
+            </button>
+          )}
         </div>
       )}
 
@@ -717,7 +906,7 @@ export default function SatelliteMapComponent({
           sendStatus.status === 'success' ? 'bg-green-100 text-green-800' :
           'bg-red-100 text-red-800'
         }`}>
-          {sendStatus.status === 'sending' && 'Đang gửi tọa độ...'}
+          {sendStatus.status === 'sending' && (sendStatus.message || 'Đang gửi tọa độ...')}
           {sendStatus.status === 'success' && sendStatus.message}
           {sendStatus.status === 'error' && `Lỗi: ${sendStatus.message}`}
         </div>
@@ -745,12 +934,24 @@ export default function SatelliteMapComponent({
                 <div className="mt-2">
                   <p className="font-medium text-sm">Đã phát hiện {landslideResults.landslide_coordinates.coordinates.length} điểm lở đất</p>
                   
-                  <button 
-                    className="mt-2 w-full py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm"
-                    onClick={() => setViewMode('landslide')}
-                  >
-                    Xem trên bản đồ
-                  </button>
+                  <div className="flex space-x-2">
+                    <button 
+                      className="mt-2 flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm"
+                      onClick={() => setViewMode('landslide')}
+                    >
+                      Xem trên bản đồ
+                    </button>
+                    
+                    <button 
+                      className="mt-2 flex-1 py-2 bg-green-500 hover:bg-green-600 text-white rounded text-sm"
+                      onClick={() => {
+                        // Sử dụng tọa độ gốc đã gửi lên API để xác nhận sạt lở
+                        openConfirmationForm();
+                      }}
+                    >
+                      Xác nhận sạt lở
+                    </button>
+                  </div>
                   
                   <div className="mt-2 p-2 bg-gray-50 rounded text-xs max-h-40 overflow-y-auto">
                     <p className="font-medium mb-1">Chi tiết tọa độ:</p>
@@ -760,6 +961,7 @@ export default function SatelliteMapComponent({
                           <th className="p-1 border text-left">ID</th>
                           <th className="p-1 border text-right">Đông</th>
                           <th className="p-1 border text-right">Bắc</th>
+                          <th className="p-1 border text-center">Hành động</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -768,11 +970,22 @@ export default function SatelliteMapComponent({
                             <td className="p-1 border">{coord.segment_id}</td>
                             <td className="p-1 border text-right">{parseFloat(coord.east.toString()).toFixed(1)}</td>
                             <td className="p-1 border text-right">{parseFloat(coord.north.toString()).toFixed(1)}</td>
+                            <td className="p-1 border text-center">
+                              <button 
+                                className="text-xs text-blue-500 hover:text-blue-700"
+                                onClick={() => {
+                                  // Sử dụng tọa độ gốc đã gửi lên API để xác nhận
+                                  openConfirmationForm();
+                                }}
+                              >
+                                Xác nhận
+                              </button>
+                            </td>
                           </tr>
                         ))}
                         {landslideResults.landslide_coordinates.coordinates.length > 5 && (
                           <tr>
-                            <td colSpan={3} className="p-1 text-center italic">
+                            <td colSpan={4} className="p-1 text-center italic">
                               ...và {landslideResults.landslide_coordinates.coordinates.length - 5} điểm khác
                             </td>
                           </tr>

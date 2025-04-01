@@ -2,6 +2,7 @@
 import { LandslidePoint } from '@/app/lib/types/landslide';
 import { StatusBadge } from '@/app/components/ui/StatusBadge';
 import { Button } from '@/app/components/ui/Button';
+import { useState, useEffect } from 'react';
 
 interface LandslideDetailProps {
   landslide: LandslidePoint;
@@ -21,7 +22,36 @@ function formatDate(dateString: string, locale: string = 'vi-VN'): string {
   }).format(date);
 }
 
+// Function to generate satellite image URL
+function getSatelliteImageUrl(lat: number, lng: number, width: number = 640, height: number = 320): string {
+  try {
+    // Tạo buffer zone xung quanh tọa độ (+-0.01 độ)
+    const buffer = 0.01;
+    
+    // Tạo URL cho Esri World Imagery Static Map
+    return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${lng-buffer},${lat-buffer},${lng+buffer},${lat+buffer}&size=${width},${height}&format=png&f=image&bboxSR=4326&imageSR=4326`;
+  } catch (error) {
+    console.error("Lỗi khi tạo URL ảnh vệ tinh:", error);
+    return `/images/satellite-placeholder.jpg`;
+  }
+}
+
 export default function LandslideDetail({ landslide, onClose, onAddToMonitoring }: LandslideDetailProps) {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  
+  // Reset loading states when landslide changes
+  useEffect(() => {
+    setImageLoaded(false);
+    setImageError(false);
+  }, [landslide.id]);
+  
+  // Generate the satellite image URL
+  const satelliteImageUrl = getSatelliteImageUrl(
+    landslide.coordinates.lat, 
+    landslide.coordinates.lng
+  );
+  
   return (
     <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl overflow-hidden w-full max-w-4xl">
@@ -42,13 +72,36 @@ export default function LandslideDetail({ landslide, onClose, onAddToMonitoring 
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
           <div className="md:col-span-2 space-y-6">
-            <div className="rounded-lg overflow-hidden bg-gray-100 h-64 flex items-center justify-center">
-              <div className="text-center text-gray-500">
-                <svg className="mx-auto h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <p className="mt-2">Ảnh vệ tinh sẽ được hiển thị ở đây</p>
-              </div>
+            <div className="rounded-lg overflow-hidden bg-gray-100 h-64 relative">
+              {/* Hiển thị placeholder khi đang tải hoặc có lỗi */}
+              {(!imageLoaded || imageError) && (
+                <div className="absolute inset-0 flex items-center justify-center text-center text-gray-500 bg-gray-100">
+                  <div>
+                    <svg className="mx-auto h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <p className="mt-2">
+                      {imageError ? 'Không thể tải ảnh vệ tinh' : 'Đang tải ảnh vệ tinh...'}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Hình ảnh vệ tinh */}
+              <img 
+                src={satelliteImageUrl}
+                alt={`Ảnh vệ tinh khu vực ${landslide.name}`}
+                className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+                onLoad={() => setImageLoaded(true)}
+                onError={() => setImageError(true)}
+              />
+              
+              {/* Hiển thị tọa độ trên ảnh */}
+              {imageLoaded && !imageError && (
+                <div className="absolute bottom-2 right-2 bg-white bg-opacity-75 px-2 py-1 rounded text-sm">
+                  {landslide.coordinates.lat.toFixed(6)}, {landslide.coordinates.lng.toFixed(6)}
+                </div>
+              )}
             </div>
             
             <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -94,7 +147,7 @@ export default function LandslideDetail({ landslide, onClose, onAddToMonitoring 
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Diện tích ảnh hưởng</p>
+                  <p className="text-sm text-gray-500">Diện tích khu vực</p>
                   <p className="font-medium">{landslide.details.affectedArea}</p>
                 </div>
                 <div>

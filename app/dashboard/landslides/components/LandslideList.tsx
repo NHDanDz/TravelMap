@@ -27,9 +27,9 @@ export default function LandslideList({
     <div>
       <div className="mb-4 flex justify-between items-center">
         <div className="flex space-x-2">
-          <h2 className="text-lg font-medium text-gray-900">Các điểm sạt lở đã phát hiện</h2>
+          <h2 className="text-lg font-medium text-gray-900">Các khu vực sạt lở đã phát hiện</h2>
           <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full flex items-center">
-            {landslides.length} điểm
+            {landslides.length} khu vực
           </span>
         </div>
         <div className="flex items-center space-x-3">

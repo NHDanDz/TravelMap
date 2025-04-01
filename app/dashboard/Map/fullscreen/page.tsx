@@ -29,6 +29,7 @@ export default function FullscreenMapPage() {
   const [detectionMode, setDetectionMode] = useState<boolean>(false);
   const [goToCoords, setGoToCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [searchCoords, setSearchCoords] = useState<{ lat: string; lng: string }>({ lat: '', lng: '' });
+  const [showSearchConfirmation, setShowSearchConfirmation] = useState<boolean>(false);
   
   // Read parameters from URL on initial load
   useEffect(() => {
@@ -59,11 +60,23 @@ export default function FullscreenMapPage() {
     }
   }, [searchParams]);
 
+  // Đặt lại showSearchConfirmation sau khi goToCoords đã được cập nhật
+  useEffect(() => {
+    if (goToCoords && showSearchConfirmation) {
+      // Đợi một chút để đảm bảo hộp thoại đã được hiển thị
+      const timer = setTimeout(() => {
+        setShowSearchConfirmation(false);
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [goToCoords, showSearchConfirmation]);
+
   // Handle search form submission
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate and convert coordinates
+    // Validate và chuyển đổi tọa độ
     const lat = parseFloat(searchCoords.lat);
     const lng = parseFloat(searchCoords.lng);
     
@@ -72,14 +85,15 @@ export default function FullscreenMapPage() {
       return;
     }
     
-    // Check coordinate range
+    // Kiểm tra phạm vi tọa độ
     if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
       alert('Tọa độ không hợp lệ. Vĩ độ phải từ -90 đến 90, kinh độ phải từ -180 đến 180.');
       return;
     }
     
-    // Update state with coordinates
+    // Cập nhật state với tọa độ và kích hoạt hiển thị hộp thoại xác nhận
     setGoToCoords({ lat, lng });
+    setShowSearchConfirmation(true);
   };
 
   // Exit fullscreen and return to dashboard
@@ -102,6 +116,7 @@ export default function FullscreenMapPage() {
           goToCoords={goToCoords} 
           detectionMode={detectionMode} 
           fullscreen={true}
+          showSearchConfirmation={showSearchConfirmation}
         />
       )}
     </div>
