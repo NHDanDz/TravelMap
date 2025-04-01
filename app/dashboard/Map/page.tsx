@@ -71,14 +71,14 @@ export default function MapPage() {
                 <li className="flex items-start">
                   <span className="bg-blue-100 text-blue-800 rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2 mt-0.5">1</span>
                   <span>Chọn kiểu bản đồ phù hợp (thường/vệ tinh)</span>
-                </li>
+                </li> 
                 <li className="flex items-start">
                   <span className="bg-blue-100 text-blue-800 rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2 mt-0.5">2</span>
-                  <span>Bật chế độ phát hiện sạt lở</span>
+                  <span>Nhấp vào vị trí cần phân tích trên bản đồ</span>
                 </li>
                 <li className="flex items-start">
                   <span className="bg-blue-100 text-blue-800 rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2 mt-0.5">3</span>
-                  <span>Nhấp vào vị trí cần phân tích trên bản đồ</span>
+                  <span>Nhấn vào phân tích để tiến hành phân tích</span>
                 </li>
                 <li className="flex items-start">
                   <span className="bg-blue-100 text-blue-800 rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2 mt-0.5">4</span>

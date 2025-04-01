@@ -8,13 +8,9 @@ export const metadata = {
 };
 
 export default function LandslidesPage() {
-  return (
-    <div className="max-w-7xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Quản lý và Theo dõi Sạt lở đất</h1>
-      
+  return ( 
       <Suspense fallback={<div className="p-4 rounded-lg bg-gray-50 animate-pulse h-96"></div>}>
         <LandslidesContent />
-      </Suspense>
-    </div>
+      </Suspense> 
   );
 }
