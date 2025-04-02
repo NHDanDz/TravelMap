@@ -67,14 +67,74 @@ export const generatePagination = (currentPage: number, totalPages: number) => {
     totalPages,
   ];
 };
-export function formatDate(dateString: string, locale: string = 'vi-VN'): string {
-  const date = new Date(dateString);
-  return new Intl.DateTimeFormat(locale, {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  }).format(date);
+
+export function formatDate(dateString: string): string {
+  if (!dateString) return 'N/A';
+  
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Invalid date';
+  }
 }
+
+export function formatDateTime(dateString: string): string {
+  if (!dateString) return 'N/A';
+  
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (error) {
+    console.error('Error formatting date time:', error);
+    return 'Invalid date';
+  }
+}
+
+
+/**
+ * Format date time as relative time (e.g. "2 hours ago", "just now", etc.)
+ */
+export function formatDateTimeRelative(date: Date | string): string {
+  if (!date) return 'N/A';
+  
+  try {
+    const targetDate = date instanceof Date ? date : new Date(date);
+    const now = new Date();
+    const diffMs = now.getTime() - targetDate.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffSecs < 60) {
+      return 'Vừa xong';
+    } else if (diffMins < 60) {
+      return `${diffMins} phút trước`;
+    } else if (diffHours < 24) {
+      return `${diffHours} giờ trước`;
+    } else if (diffDays < 7) {
+      return `${diffDays} ngày trước`;
+    } else {
+      return formatDateTime(targetDate.toISOString());
+    }
+  } catch (error) {
+    console.error('Error formatting relative time:', error);
+    return 'Invalid date';
+  }
+}
+
 
 export function getStatusColor(status: string): string {
   switch(status) {
@@ -94,3 +154,5 @@ export function getRiskLevelColor(level: string): string {
     default: return 'gray';
   }
 }
+
+

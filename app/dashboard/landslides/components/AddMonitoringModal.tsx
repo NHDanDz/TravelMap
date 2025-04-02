@@ -11,19 +11,13 @@ interface AddMonitoringModalProps {
 }
 
 // Helper function to format date
-function formatDate(dateString: string | undefined, locale: string = 'vi-VN'): string {
-  try {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat(locale, {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    }).format(date);
-  } catch (error) {
-    console.error("Lỗi khi định dạng ngày:", error);
-    return dateString || 'N/A';
-  }
+function formatDate(dateString: string, locale: string = 'vi-VN'): string {
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat(locale, {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }).format(date);
 }
 
 export default function AddMonitoringModal({ landslide, onClose, onAddMonitoring }: AddMonitoringModalProps) {
@@ -36,25 +30,50 @@ export default function AddMonitoringModal({ landslide, onClose, onAddMonitoring
   };
 
   const [name, setName] = useState(`${landslide.name} - Monitoring Area`);
-  const [description, setDescription] = useState(`Khu vực theo dõi sạt lở ${landslide.name}`);
   const [monitorFrequency, setMonitorFrequency] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly'>('daily');
   const [autoVerify, setAutoVerify] = useState(false);
   const [loading, setLoading] = useState(false);
   const [boundingBox, setBoundingBox] = useState(defaultBoundingBox);
+  
+  // Thêm state rủi ro mặc định
+  const [riskLevel, setRiskLevel] = useState<'low' | 'medium' | 'high'>('medium');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      await onAddMonitoring({
-        name, 
-        boundingBox,
+      const now = new Date().toISOString();
+      
+      // Tạo dữ liệu giống với interface MonitoringArea
+      const monitoringData: Partial<MonitoringArea> = {
+        id: `MON${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`, // ID ngẫu nhiên
+        name,
+        boundingBox: {
+          north: boundingBox.north,
+          south: boundingBox.south,
+          east: boundingBox.east,
+          west: boundingBox.west
+        },
         monitorFrequency,
-        autoVerify,
+        createdAt: now,
+        lastChecked: now,
+        status: 'active',
+        detectedPoints: 0,
+        riskLevel,
         landslideId: landslide.id,
-        createdAt: new Date().toISOString()
-      });
+        autoVerify
+      };
+      
+      // Gọi API
+      await onAddMonitoring(monitoringData);
+      
+      // Hiển thị thông báo thành công
+      alert("Đã thêm khu vực theo dõi mới");
+      
+      // Đóng modal
+      onClose();
+      
     } catch (error) {
       console.error('Error adding monitoring area:', error);
       alert('Có lỗi xảy ra khi thêm khu vực theo dõi!');
@@ -106,19 +125,6 @@ export default function AddMonitoringModal({ landslide, onClose, onAddMonitoring
           </div>
 
           <div className="mb-4">
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-              Mô tả
-            </label>
-            <textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
-              rows={2}
-            />
-          </div>
-
-          <div className="mb-4">
             <label htmlFor="frequency" className="block text-sm font-medium text-gray-700 mb-1">
               Tần suất theo dõi
             </label>
@@ -132,6 +138,23 @@ export default function AddMonitoringModal({ landslide, onClose, onAddMonitoring
               <option value="weekly">Hàng tuần</option>
               <option value="biweekly">Hai tuần một lần</option>
               <option value="monthly">Hàng tháng</option>
+            </select>
+          </div>
+
+          {/* Thêm selector mức độ rủi ro */}
+          <div className="mb-4">
+            <label htmlFor="risk-level" className="block text-sm font-medium text-gray-700 mb-1">
+              Mức độ rủi ro
+            </label>
+            <select
+              id="risk-level"
+              value={riskLevel}
+              onChange={(e) => setRiskLevel(e.target.value as 'low' | 'medium' | 'high')}
+              className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+            >
+              <option value="low">Thấp</option>
+              <option value="medium">Trung bình</option>
+              <option value="high">Cao</option>
             </select>
           </div>
 
@@ -149,6 +172,7 @@ export default function AddMonitoringModal({ landslide, onClose, onAddMonitoring
                   value={boundingBox.north}
                   onChange={(e) => setBoundingBox({ ...boundingBox, north: parseFloat(e.target.value) })}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                  required
                 />
               </div>
               <div>
@@ -162,6 +186,7 @@ export default function AddMonitoringModal({ landslide, onClose, onAddMonitoring
                   value={boundingBox.south}
                   onChange={(e) => setBoundingBox({ ...boundingBox, south: parseFloat(e.target.value) })}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                  required
                 />
               </div>
               <div>
@@ -175,6 +200,7 @@ export default function AddMonitoringModal({ landslide, onClose, onAddMonitoring
                   value={boundingBox.east}
                   onChange={(e) => setBoundingBox({ ...boundingBox, east: parseFloat(e.target.value) })}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                  required
                 />
               </div>
               <div>
@@ -188,9 +214,13 @@ export default function AddMonitoringModal({ landslide, onClose, onAddMonitoring
                   value={boundingBox.west}
                   onChange={(e) => setBoundingBox({ ...boundingBox, west: parseFloat(e.target.value) })}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                  required
                 />
               </div>
             </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Những tọa độ này xác định khu vực vuông sẽ được theo dõi thường xuyên.
+            </p>
           </div>
 
           <div className="mb-4">

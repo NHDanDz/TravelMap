@@ -295,55 +295,111 @@ export default function SatelliteMapComponent({
   }, []);
   
   // Hàm xử lý khi người dùng xác nhận điểm sạt lở
-  const handleLandslideConfirmation = async (landslideData: any) => {
-    try {
-      setSendStatus({ status: 'sending', message: 'Đang lưu thông tin điểm sạt lở...' });
-      
-      // Gọi API endpoint để lưu điểm sạt lở đã xác nhận
-      const response = await fetch('/api/landslide-confirmation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...landslideData,
-          detectionResultId: landslideResults?.id || null,
-          originalCoordinates: landslideResults?.landslide_coordinates?.coordinates || []
-        }),
-      });
+  // Hàm xử lý khi người dùng xác nhận điểm sạt lở
+const handleLandslideConfirmation = async (landslideData: any) => {
+  try {
+    setSendStatus({ status: 'sending', message: 'Đang lưu thông tin điểm sạt lở...' });
+    
+    // Determine if this is an update or new landslide
+    const isUpdate = !!landslideData.id;
+    const apiMethod = isUpdate ? 'PUT' : 'POST';
+    
+    // Gọi API endpoint để lưu điểm sạt lở đã xác nhận
+    const response = await fetch('/api/landslide-confirmation', {
+      method: apiMethod,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ...landslideData,
+        detectionResultId: landslideResults?.id || null,
+        originalCoordinates: landslideResults?.landslide_coordinates?.coordinates || []
+      }),
+    });
 
-      if (!response.ok) {
-        throw new Error('Lỗi khi lưu thông tin điểm sạt lở');
+    // Handle conflict response - might be trying to create a duplicate
+    if (response.status === 409) {
+      const errorData = await response.json();
+      
+      // If it's a duplicate error with landslide info, we can use this information
+      if (errorData.duplicate && errorData.landslide) {
+        console.log('Duplicate landslide detected:', errorData.landslide);
+        
+        // Update the existing landslide instead
+        const updateResponse = await fetch('/api/landslide-confirmation', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...landslideData,
+            id: errorData.landslide.id, // Use the existing ID
+            detectionResultId: landslideResults?.id || null,
+            originalCoordinates: landslideResults?.landslide_coordinates?.coordinates || []
+          }),
+        });
+        
+        if (!updateResponse.ok) {
+          throw new Error('Lỗi khi cập nhật thông tin điểm sạt lở');
+        }
+        
+        const updateResult = await updateResponse.json();
+        console.log('Đã cập nhật điểm sạt lở:', updateResult);
+        
+        setSendStatus({
+          status: 'success',
+          message: `Đã cập nhật điểm sạt lở: ${landslideData.name}`,
+        });
+        
+        // Đóng form xác nhận
+        setShowConfirmationForm(false);
+        
+        // Tự động ẩn thông báo sau 5 giây
+        setTimeout(() => {
+          setSendStatus({ status: 'idle' });
+        }, 5000);
+        
+        return;
+      } else {
+        throw new Error(errorData.error || 'Lỗi khi lưu thông tin điểm sạt lở');
       }
-
-      const result = await response.json();
-      console.log('Đã lưu điểm sạt lở:', result);
-      
-      setSendStatus({
-        status: 'success',
-        message: `Đã xác nhận và lưu điểm sạt lở: ${landslideData.name}`,
-      });
-      
-      // Đóng form xác nhận
-      setShowConfirmationForm(false);
-      
-      // Tự động ẩn thông báo sau 5 giây
-      setTimeout(() => {
-        setSendStatus({ status: 'idle' });
-      }, 5000);
-    } catch (error) {
-      console.error('Lỗi khi lưu điểm sạt lở:', error);
-      setSendStatus({
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Lỗi khi lưu thông tin điểm sạt lở',
-      });
-      
-      // Tự động ẩn thông báo lỗi sau 5 giây
-      setTimeout(() => {
-        setSendStatus({ status: 'idle' });
-      }, 5000);
     }
-  };
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Lỗi khi lưu thông tin điểm sạt lở');
+    }
+
+    const result = await response.json();
+    console.log('Đã lưu điểm sạt lở:', result);
+    
+    setSendStatus({
+      status: 'success',
+      message: isUpdate 
+        ? `Đã cập nhật điểm sạt lở: ${landslideData.name}`
+        : `Đã xác nhận và lưu điểm sạt lở: ${landslideData.name}`,
+    });
+    
+    // Đóng form xác nhận
+    setShowConfirmationForm(false);
+    
+    // Tự động ẩn thông báo sau 5 giây
+    setTimeout(() => {
+      setSendStatus({ status: 'idle' });
+    }, 5000);
+  } catch (error) {
+    console.error('Lỗi khi lưu điểm sạt lở:', error);
+    setSendStatus({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Lỗi khi lưu thông tin điểm sạt lở',
+    });
+    
+    // Tự động ẩn thông báo lỗi sau 5 giây
+    setTimeout(() => {
+      setSendStatus({ status: 'idle' });
+    }, 5000);
+  }
+};
   
   // Hàm chụp ảnh khu vực bản đồ đã chọn
   const captureMapArea = useCallback(() => {
@@ -958,38 +1014,19 @@ export default function SatelliteMapComponent({
                     <table className="w-full text-xs">
                       <thead className="bg-gray-100">
                         <tr>
-                          <th className="p-1 border text-left">ID</th>
-                          <th className="p-1 border text-right">Đông</th>
-                          <th className="p-1 border text-right">Bắc</th>
-                          <th className="p-1 border text-center">Hành động</th>
-                        </tr>
+                          <th className="p-1 border text-center mx-auto">ID</th>
+                          <th className="p-1 border text-center mx-auto">Đông</th>
+                          <th className="p-1 border text-center mx-auto">Bắc</th>
+                         </tr>
                       </thead>
                       <tbody>
-                        {landslideResults.landslide_coordinates.coordinates.slice(0, 5).map((coord: LandslideCoordinate, idx: number) => (
+                        {landslideResults.landslide_coordinates.coordinates.map((coord: LandslideCoordinate, idx: number) => (
                           <tr key={coord.segment_id || idx}>
                             <td className="p-1 border">{coord.segment_id}</td>
                             <td className="p-1 border text-right">{parseFloat(coord.east.toString()).toFixed(1)}</td>
                             <td className="p-1 border text-right">{parseFloat(coord.north.toString()).toFixed(1)}</td>
-                            <td className="p-1 border text-center">
-                              <button 
-                                className="text-xs text-blue-500 hover:text-blue-700"
-                                onClick={() => {
-                                  // Sử dụng tọa độ gốc đã gửi lên API để xác nhận
-                                  openConfirmationForm();
-                                }}
-                              >
-                                Xác nhận
-                              </button>
-                            </td>
                           </tr>
-                        ))}
-                        {landslideResults.landslide_coordinates.coordinates.length > 5 && (
-                          <tr>
-                            <td colSpan={4} className="p-1 text-center italic">
-                              ...và {landslideResults.landslide_coordinates.coordinates.length - 5} điểm khác
-                            </td>
-                          </tr>
-                        )}
+                        ))} 
                       </tbody>
                     </table>
                   </div>

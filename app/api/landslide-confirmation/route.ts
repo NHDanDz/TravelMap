@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/app/lib/db';
 import { landslides, alerts } from '@/app/lib/db/schema';
 import { v4 as uuidv4 } from 'uuid';
-import { and, between, gte, lte } from 'drizzle-orm';
+import { and, between, gte, lte, eq } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
 
 // Định nghĩa kiểu dữ liệu 
@@ -71,6 +71,7 @@ async function checkCoordinateExists(lat: number, lng: number, tolerance: number
   }
 }
 
+// POST endpoint để tạo mới điểm sạt lở
 export async function POST(request: NextRequest) {
   try {
     // Lấy dữ liệu từ request
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
       formData.coordinates.lng
     );
     
-    // Nếu tọa độ đã tồn tại, trả về thông báo lỗi
+    // Nếu tọa độ đã tồn tại, trả về thông báo lỗi và thông tin landslide
     if (exists && existingLandslide) {
       return NextResponse.json(
         { 
@@ -113,7 +114,6 @@ export async function POST(request: NextRequest) {
     const id = formData.id || `LS${Date.now().toString().slice(-6)}`;
     
     try {
-      // Bắt đầu giao dịch dữ liệu
       // Thêm dữ liệu sạt lở vào database - tương thích với schema
       await db.insert(landslides).values({
         id: id,
@@ -130,16 +130,16 @@ export async function POST(request: NextRequest) {
         updated_at: new Date()
       });
       
-      // Tạo cảnh báo khi xác nhận sạt lở
+      // Tạo cảnh báo khi xác nhận sạt lở - đã sửa theo schema
       await db.insert(alerts).values({
         type: 'info',
         title: 'Xác nhận điểm sạt lở',
         description: `Đã xác nhận điểm sạt lở tại: ${formData.name}`,
         date: new Date(),
-        landslide_id: id,
+        landslideId: id,
         read: false,
-        user_id: 'system', // Có thể thay đổi thành ID người dùng thực tế
-        created_at: new Date()
+        userId: 'system', // Đã sửa theo schema
+        createdAt: new Date()
       });
       
       // Trả về kết quả thành công
@@ -161,6 +161,85 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json(
       { error: 'Lỗi server khi xử lý yêu cầu.' },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT endpoint để cập nhật điểm sạt lở hiện có
+export async function PUT(request: NextRequest) {
+  try {
+    // Lấy dữ liệu từ request
+    const formData: LandslideData = await request.json();
+    
+    // Kiểm tra dữ liệu cần thiết
+    if (!formData.id || !formData.name || !formData.coordinates) {
+      return NextResponse.json(
+        { error: 'Dữ liệu không hợp lệ. Cần có ID, tên và tọa độ.' },
+        { status: 400 }
+      );
+    }
+    
+    try {
+      // Kiểm tra xem ID tồn tại không
+      const existingRecord = await db
+        .select()
+        .from(landslides)
+        .where(eq(landslides.id, formData.id));
+      
+      if (existingRecord.length === 0) {
+        return NextResponse.json(
+          { error: 'Không tìm thấy điểm sạt lở với ID đã cung cấp.' },
+          { status: 404 }
+        );
+      }
+      
+      // Cập nhật dữ liệu sạt lở trong database
+      await db.update(landslides)
+        .set({
+          name: formData.name,
+          lat: formData.coordinates.lat.toString(),
+          lng: formData.coordinates.lng.toString(),
+          status: formData.status,
+          affected_area: formData.details.affectedArea,
+          potential_impact: formData.details.potentialImpact,
+          last_update: new Date(formData.details.lastUpdate),
+          history: JSON.stringify(formData.history),
+          updated_at: new Date()
+        })
+        .where(eq(landslides.id, formData.id));
+      
+      // Tạo cảnh báo khi cập nhật sạt lở
+      await db.insert(alerts).values({
+        type: 'info',
+        title: 'Cập nhật điểm sạt lở',
+        description: `Đã cập nhật thông tin điểm sạt lở: ${formData.name}`,
+        date: new Date(),
+        landslideId: formData.id,
+        read: false,
+        userId: 'system',
+        createdAt: new Date()
+      });
+      
+      // Trả về kết quả thành công
+      return NextResponse.json({
+        success: true,
+        message: `Đã cập nhật thông tin điểm sạt lở: ${formData.name}`,
+        id: formData.id
+      });
+    } catch (dbError) {
+      console.error('Lỗi database khi cập nhật điểm sạt lở:', dbError);
+      return NextResponse.json(
+        { error: 'Lỗi khi cập nhật dữ liệu trong cơ sở dữ liệu.' },
+        { status: 500 }
+      );
+    }
+    
+  } catch (error) {
+    console.error('Lỗi khi xử lý yêu cầu cập nhật điểm sạt lở:', error);
+    
+    return NextResponse.json(
+      { error: 'Lỗi server khi xử lý yêu cầu cập nhật.' },
       { status: 500 }
     );
   }
