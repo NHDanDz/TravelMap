@@ -64,7 +64,7 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className={`bg-white border-r border-gray-200 transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}>
+    <aside className={`bg-white border-r border-gray-200 transition-all duration-300 ${collapsed ? 'w-16' : 'w-56'}`}>
       <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200">
         {!collapsed && <h2 className="text-lg font-semibold text-gray-800">Dashboard</h2>}
         <button 

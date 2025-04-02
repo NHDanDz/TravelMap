@@ -182,25 +182,25 @@ function convertDBToLandslideFormat(dbLandslide: any): LandslidePoint {
 }
 
 // Convert MonitoringArea object to database format
+// Convert MonitoringArea object to database format
 function convertMonitoringAreaToDBFormat(area: MonitoringArea) {
   return {
     id: area.id,
     name: area.name,
-    north_bound: area.boundingBox.north.toString(),
-    south_bound: area.boundingBox.south.toString(),
-    east_bound: area.boundingBox.east.toString(),
-    west_bound: area.boundingBox.west.toString(),
-    created_at: new Date(area.createdAt),
-    monitor_frequency: area.monitorFrequency,
-    last_checked: new Date(area.lastChecked),
+    northBound: area.boundingBox.north.toString(),  // Use camelCase to match schema
+    southBound: area.boundingBox.south.toString(),  // Use camelCase to match schema
+    eastBound: area.boundingBox.east.toString(),    // Use camelCase to match schema
+    westBound: area.boundingBox.west.toString(),    // Use camelCase to match schema
+    createdAt: new Date(area.createdAt),            // Use camelCase to match schema
+    monitorFrequency: area.monitorFrequency,
+    lastChecked: new Date(area.lastChecked),        // Use camelCase to match schema
     status: area.status,
-    detected_points: area.detectedPoints,
-    risk_level: area.riskLevel,
-    landslide_id: area.landslideId,
-    auto_verify: area.autoVerify
+    detectedPoints: area.detectedPoints,           // Use camelCase to match schema
+    riskLevel: area.riskLevel,                     // Use camelCase to match schema
+    landslideId: area.landslideId,                 // Use camelCase to match schema
+    autoVerify: area.autoVerify                    // Use camelCase to match schema
   };
 }
-
 // Convert from database format to MonitoringArea
 function convertDBToMonitoringAreaFormat(dbArea: any): MonitoringArea {
   return {
@@ -374,7 +374,23 @@ export async function saveMonitoringArea(areaData: MonitoringArea) {
       return { success: true };
     }
     
+    // Validate that boundingBox values exist
+    if (!areaData.boundingBox || 
+        areaData.boundingBox.north === undefined || 
+        areaData.boundingBox.south === undefined ||
+        areaData.boundingBox.east === undefined ||
+        areaData.boundingBox.west === undefined) {
+      console.error('❌ Invalid boundingBox data:', areaData.boundingBox);
+      return { 
+        success: false, 
+        error: 'Missing boundingBox coordinates'
+      };
+    }
+    
     const dbArea = convertMonitoringAreaToDBFormat(areaData);
+    
+    // Log the converted data to verify it's correct
+    console.log('Converting to DB format:', dbArea);
     
     return await withRetry(async () => {
       // Check if the area already exists
@@ -397,10 +413,10 @@ export async function saveMonitoringArea(areaData: MonitoringArea) {
           title: 'New area being monitored',
           description: `Area ${areaData.name} (${areaData.id}) has been added to the continuous monitoring list.`,
           date: new Date(),
-          monitoring_area_id: areaData.id,
+          monitoringAreaId: areaData.id,
           read: false,
-          user_id: 'system',
-          created_at: new Date()
+          userId: 'system',  // Thêm giá trị mặc định 'system' cho userId
+          createdAt: new Date()
         });
       }
       

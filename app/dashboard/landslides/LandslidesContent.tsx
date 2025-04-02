@@ -1,5 +1,6 @@
 // app/dashboard/landslides/LandslidesContent.tsx
 'use client';
+import { Toaster } from 'react-hot-toast';
 
 import { useEffect, useState } from 'react';
 import LandslideTabs from './components/LandslideTabs';
@@ -195,6 +196,7 @@ export default function LandslidesContent() {
   }
 
   return (
+    <>
     <DashboardLayout>
       <LandslideTabs
         initialLandslides={landslides}
@@ -206,5 +208,8 @@ export default function LandslidesContent() {
         onSaveNotificationSettings={handleSaveNotificationSettings}
       />
     </DashboardLayout>
+    <Toaster position="top-right" />
+
+    </>
   );
 }

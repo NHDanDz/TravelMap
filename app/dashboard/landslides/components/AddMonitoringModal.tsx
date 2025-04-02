@@ -45,9 +45,9 @@ export default function AddMonitoringModal({ landslide, onClose, onAddMonitoring
     try {
       const now = new Date().toISOString();
       
-      // Tạo dữ liệu giống với interface MonitoringArea
+      // Ensure all boundingBox values are explicitly set as strings
       const monitoringData: Partial<MonitoringArea> = {
-        id: `MON${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`, // ID ngẫu nhiên
+        id: `MON${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
         name,
         boundingBox: {
           north: boundingBox.north,
@@ -65,13 +65,15 @@ export default function AddMonitoringModal({ landslide, onClose, onAddMonitoring
         autoVerify
       };
       
-      // Gọi API
+      // Log data before sending to API to verify it's correct
+      console.log('Sending monitoring data:', JSON.stringify(monitoringData));
+      
+      // Call API
       await onAddMonitoring(monitoringData);
       
-      // Hiển thị thông báo thành công
-      alert("Đã thêm khu vực theo dõi mới");
+      // Show success message 
       
-      // Đóng modal
+      // Close modal
       onClose();
       
     } catch (error) {

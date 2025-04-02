@@ -1,6 +1,6 @@
 // app/dashboard/landslides/components/LandslideTabs.tsx
 'use client';
-
+import toast from 'react-hot-toast';
 import { useState } from 'react';
 import { Tab } from '@headlessui/react';
 import LandslideList from './LandslideList';
@@ -71,8 +71,24 @@ export default function LandslideTabs({
       setMonitoredAreas([...monitoredAreas, newArea]);
       setShowAddMonitorModal(false);
       
-      // Alert user
-      alert(`Đã thêm "${selectedLandslide?.name}" vào danh sách theo dõi liên tục!`);
+      // Thay thế alert bằng toast
+      toast.success(
+        `Đã thêm "${selectedLandslide?.name}" vào danh sách theo dõi liên tục!`, 
+        {
+          style: {
+            background: '#4ade80', // Màu xanh lá nhẹ
+            color: 'white',
+            fontWeight: 'bold',
+            padding: '12px 20px',
+            borderRadius: '8px'
+          },
+          iconTheme: {
+            primary: 'white',
+            secondary: '#16a34a'
+          },
+          duration: 3000 // Hiển thị trong 3 giây
+        }
+      );
     }
   };
 
@@ -83,10 +99,22 @@ export default function LandslideTabs({
     // Update local state directly since we don't have a success flag
     setNotificationSettings(settings);
     
-    // Alert user
-    alert(`Đã lưu cài đặt thông báo!`);
+    // Thay thế alert bằng toast
+    toast.success('Đã lưu cài đặt thông báo!', {
+      style: {
+        background: '#4ade80',
+        color: 'white',
+        fontWeight: 'bold',
+        padding: '12px 20px',
+        borderRadius: '8px'
+      },
+      iconTheme: {
+        primary: 'white',
+        secondary: '#16a34a'
+      },
+      duration: 3000
+    });
   };
-
   return (
     <>
       <Tab.Group onChange={setActiveTab}>

@@ -7,6 +7,7 @@ import { toast } from 'react-hot-toast';
 
 interface MonitoringTableProps {
   areas: MonitoringArea[];
+  onUpdateArea?: (area: MonitoringArea) => Promise<boolean>;
 }
 
 // Tạo kiểu dữ liệu cho trạng thái giám sát
@@ -137,7 +138,7 @@ const formatTimeRemaining = (targetDate: Date): string => {
   return `${diffDays} ngày nữa`;
 };
 
-export default function MonitoringTable({ areas }: MonitoringTableProps) {
+export default function MonitoringTable({ areas, onUpdateArea }: MonitoringTableProps) {
   // State để lưu trạng thái giám sát của từng khu vực
   const [monitoringStatus, setMonitoringStatus] = useState<Record<string, MonitoringStatus>>({});
   // State để lưu danh sách thông báo
@@ -148,10 +149,17 @@ export default function MonitoringTable({ areas }: MonitoringTableProps) {
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
   // State để đếm số thông báo chưa đọc
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  // State để hiển thị/ẩn khu vực đã dừng theo dõi
+  const [showPaused, setShowPaused] = useState<boolean>(false);
   
   // Refs to track current monitoring areas
   const activeMonitoringJobs = useRef<Map<string, { intervalId: NodeJS.Timeout, status: string }>>(new Map());
   const cacheCleanupInterval = useRef<NodeJS.Timeout | null>(null);
+
+  // Lọc danh sách khu vực để hiển thị
+  const areasToDisplay = showPaused 
+    ? updatedAreas 
+    : updatedAreas.filter(area => area.status === 'active');
 
   // Khởi tạo trạng thái giám sát cho tất cả khu vực
   useEffect(() => {
@@ -204,11 +212,13 @@ export default function MonitoringTable({ areas }: MonitoringTableProps) {
   // Hàm kiểm tra tất cả khu vực và gửi yêu cầu khi cần
   const checkAreasForMonitoring = () => {
     updatedAreas.forEach(area => {
+      // Chỉ kiểm tra khu vực đang hoạt động
+      if (area.status !== 'active') return;
+      
       // Kiểm tra nếu đã đến thời gian và không đang trong quá trình kiểm tra
       const status = monitoringStatus[area.id] || { status: 'idle' };
       
       if (
-        area.status === 'active' &&
         shouldCheckNow(area.lastChecked, area.monitorFrequency) &&
         status.status !== 'checking'
       ) {
@@ -229,6 +239,12 @@ export default function MonitoringTable({ areas }: MonitoringTableProps) {
     // Tìm khu vực trong danh sách
     const area = updatedAreas.find(a => a.id === areaId);
     if (!area) return;
+    
+    // Kiểm tra xem khu vực có đang hoạt động không
+    if (area.status !== 'active') {
+      console.log(`Khu vực ${areaId} đã dừng theo dõi, bỏ qua yêu cầu giám sát`);
+      return;
+    }
     
     // Cập nhật trạng thái thành "đang kiểm tra"
     setMonitoringStatus(prev => ({
@@ -367,6 +383,56 @@ export default function MonitoringTable({ areas }: MonitoringTableProps) {
     monitorArea(areaId);
   };
 
+  // Hàm xử lý khi nhấn nút dừng/kích hoạt theo dõi
+  const handleToggleStatus = async (areaId: string) => {
+    // Tìm khu vực trong danh sách
+    const area = updatedAreas.find(a => a.id === areaId);
+    if (!area) return;
+    
+    // Tạo một bản sao của khu vực với trạng thái đã cập nhật
+    const updatedArea: MonitoringArea = {
+      ...area,
+      status: area.status === 'active' ? 'paused' : 'active'
+    };
+    
+    try {
+      let success = true;
+      
+      // Gọi API để cập nhật trạng thái trong cơ sở dữ liệu (nếu có)
+      if (onUpdateArea) {
+        success = await onUpdateArea(updatedArea);
+      }
+      
+      if (!success) {
+        toast.error(`Không thể ${area.status === 'active' ? 'dừng' : 'kích hoạt'} khu vực: ${area.name}`);
+        return;
+      }
+      
+      // Cập nhật state cục bộ
+      setUpdatedAreas(prev => 
+        prev.map(a => a.id === areaId ? updatedArea : a)
+      );
+      
+      // Hiển thị thông báo thành công
+      toast.success(`Đã ${area.status === 'active' ? 'dừng theo dõi' : 'kích hoạt theo dõi'} khu vực: ${area.name}`);
+      
+      // Thêm thông báo mới vào danh sách
+      const newNotification = {
+        id: `notification-${Date.now()}`,
+        message: `Khu vực ${area.name}: Đã ${area.status === 'active' ? 'dừng theo dõi' : 'kích hoạt theo dõi'}`,
+        type: 'info',
+        timestamp: new Date()
+      };
+      
+      setNotifications(prev => [newNotification, ...prev.slice(0, 19)]);
+      setUnreadCount(prev => prev + 1);
+      
+    } catch (error) {
+      console.error('Lỗi khi cập nhật trạng thái khu vực:', error);
+      toast.error(`Lỗi: Không thể cập nhật trạng thái khu vực ${area.name}`);
+    }
+  };
+
   // Xử lý khi đọc thông báo
   const handleViewNotifications = () => {
     setShowNotifications(!showNotifications);
@@ -409,10 +475,31 @@ export default function MonitoringTable({ areas }: MonitoringTableProps) {
         <div className="flex space-x-2 items-center">
           <h2 className="text-lg font-semibold text-gray-900">Theo dõi liên tục</h2>
           <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
-            {updatedAreas.length} khu vực
+            {updatedAreas.filter(a => a.status === 'active').length} khu vực đang theo dõi
           </span>
+          {updatedAreas.filter(a => a.status === 'paused').length > 0 && (
+            <span className="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+              {updatedAreas.filter(a => a.status === 'paused').length} khu vực đã dừng
+            </span>
+          )}
         </div>
         <div className="flex items-center space-x-3">
+          {/* Option để hiển thị/ẩn khu vực đã dừng */}
+          {updatedAreas.filter(a => a.status === 'paused').length > 0 && (
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="show-paused"
+                checked={showPaused}
+                onChange={(e) => setShowPaused(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="show-paused" className="ml-2 text-sm text-gray-700">
+                Hiển thị khu vực đã dừng
+              </label>
+            </div>
+          )}
+          
           {/* Nút thông báo */}
           <div className="relative">
             <button 
@@ -487,140 +574,172 @@ export default function MonitoringTable({ areas }: MonitoringTableProps) {
       </div>
 
       <div className="overflow-x-auto"> 
-<div className="overflow-x-auto w-full">
-  <table className="min-w-full divide-y divide-gray-200 table-fixed">
-    <thead className="bg-gray-50 sticky top-0 z-10">
-      <tr className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-        <th className="py-3 px-3 text-center w-40 min-w-40">Tên khu vực</th>
-        <th className="py-3 px-3 text-center w-36 min-w-36">Tọa độ</th>
-        <th className="py-3 px-3 text-center w-28 min-w-28">Tần suất</th>
-        <th className="py-3 px-3 text-center w-40 min-w-40">Kiểm tra gần nhất</th>
-        <th className="py-3 px-3 text-center w-36 min-w-36">Kiểm tra tiếp theo</th>
-        <th className="py-3 px-3 text-center w-32 min-w-32">Phát hiện</th>
-        <th className="py-3 px-3 text-center w-24 min-w-24">Rủi ro</th>
-        <th className="py-3 px-3 text-center w-32 min-w-32">Trạng thái</th>
-        <th className="py-3 px-3 text-center w-40 min-w-40">Thao tác</th>
-      </tr>
-    </thead>
-    <tbody className="bg-white divide-y divide-gray-200">
-      {updatedAreas.map((area) => {
-        const status = monitoringStatus[area.id] || { status: 'idle' };
-        const nextCheckTime = getNextCheckTime(area.lastChecked, area.monitorFrequency);
-        const timeRemaining = formatTimeRemaining(nextCheckTime);
-        
-        let detectedText = '';
-        if (status.status === 'success' && status.message && status.message.includes('phát hiện')) {
-          const match = status.message.match(/phát hiện (\d+) điểm/i);
-          if (match && match[1]) {
-            detectedText = `Đã phát hiện ${match[1]} điểm sạt lở`;
-          }
-        }
-        
-        return (
-          <tr key={area.id} className={`hover:bg-gray-50 ${status.status === 'checking' ? 'bg-blue-50' : ''}`}>
-            <td className="py-2 px-3">
-              <div className="font-medium text-gray-900 truncate" title={area.name}>{area.name}</div>
-              <div className="text-xs text-gray-500 truncate">ID: {area.id}</div>
-            </td>
-            
-            <td className="py-2 px-3 text-sm text-gray-500 text-center">
-              <div className="text-xs whitespace-nowrap"> 
-                {((area.boundingBox.north + area.boundingBox.south) / 2).toFixed(2)},{((area.boundingBox.east + area.boundingBox.west) / 2).toFixed(2)}
-              </div>
-            </td>
-            
-            <td className="py-2 px-3 text-sm text-gray-500 text-center whitespace-nowrap">
-              {formatFrequency(area.monitorFrequency)}
-            </td>
-            
-            <td className="py-2 px-3 text-sm text-gray-500 text-center">
-              <div className="whitespace-nowrap">{formatDate(area.lastChecked)}</div>
-              
-              {status.status === 'checking' && (
-                <div className="text-xs text-blue-600 flex items-center justify-center mt-1">
-                  <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse mr-1"></div>
-                  <span className="whitespace-nowrap">Đang kiểm tra...</span>
-                </div>
-              )}
-              
-              {status.status === 'success' && detectedText && (
-                <div className="text-xs text-green-600 mt-1 truncate" title={detectedText}>
-                  {detectedText}
-                </div>
-              )}
-              
-              {status.status === 'error' && status.message && (
-                <div className="text-xs text-red-600 mt-1 truncate" title={status.message}>
-                  {status.message}
-                </div>
-              )}
-            </td>
-            
-            <td className="py-2 px-3 text-sm text-gray-500 text-center">
-              <div className={`truncate whitespace-nowrap ${shouldCheckNow(area.lastChecked, area.monitorFrequency) ? 'text-red-600 font-medium' : ''}`}>
-                {shouldCheckNow(area.lastChecked, area.monitorFrequency) ? 'Đến hạn kiểm tra' : timeRemaining}
-              </div>
-            </td>
-            
-            <td className="py-2 px-3 text-center">
-              <div className="truncate" title={typeof renderDetectedPoints === 'function' ? 'Chi tiết phát hiện' : ''}>
-                {renderDetectedPoints(area.detectedPoints)}
-              </div>
-            </td>
-            
-            <td className="py-2 px-3 text-center">
-              <div className="truncate">
-                {renderRiskLevel(area.riskLevel)}
-              </div>
-            </td>
-            
-            <td className="py-2 px-3 text-center">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap
-                ${area.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                {area.status === 'active' ? 'Đang theo dõi' : 'Tạm dừng'}
-              </span>
-            </td>
-            
-            <td className="py-2 px-3 text-center">
-              <div className="flex justify-center space-x-1">
-                <button 
-                  onClick={() => handleManualMonitoring(area.id)}
-                  disabled={status.status === 'checking'}
-                  className={`text-xs px-2 py-1 rounded 
-                    ${status.status === 'checking' 
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                      : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
-                >
-                  Kiểm tra
-                </button>
+        <div className="overflow-x-auto w-full">
+          <table className="min-w-full divide-y divide-gray-200 table-fixed">
+            <thead className="bg-gray-50 sticky top-0 z-10">
+              <tr className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="py-3 px-3 text-center w-40 min-w-40">Tên khu vực</th>
+                <th className="py-3 px-3 text-center w-36 min-w-36">Tọa độ</th>
+                <th className="py-3 px-3 text-center w-28 min-w-28">Tần suất</th>
+                <th className="py-3 px-3 text-center w-40 min-w-40">Kiểm tra gần nhất</th>
+                <th className="py-3 px-3 text-center w-36 min-w-36">Kiểm tra tiếp theo</th>
+                <th className="py-3 px-3 text-center w-32 min-w-32">Phát hiện</th>
+                <th className="py-3 px-3 text-center w-24 min-w-24">Rủi ro</th>
+                <th className="py-3 px-3 text-center w-32 min-w-32">Trạng thái</th>
+                <th className="py-3 px-3 text-center w-40 min-w-40">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {areasToDisplay.map((area) => {
+                const status = monitoringStatus[area.id] || { status: 'idle' };
+                const nextCheckTime = getNextCheckTime(area.lastChecked, area.monitorFrequency);
+                const timeRemaining = formatTimeRemaining(nextCheckTime);
                 
-                <button 
-                  className="text-xs px-2 py-1 rounded bg-gray-50 text-gray-700 hover:bg-gray-100"
-                >
-                  Sửa
-                </button>
+                let detectedText = '';
+                if (status.status === 'success' && status.message && status.message.includes('phát hiện')) {
+                  const match = status.message.match(/phát hiện (\d+) điểm/i);
+                  if (match && match[1]) {
+                    detectedText = `Đã phát hiện ${match[1]} điểm sạt lở`;
+                  }
+                }
                 
-                <button className="text-xs px-2 py-1 rounded bg-gray-50 text-gray-700 hover:bg-gray-100">
-                  {area.status === 'active' ? 'Dừng' : 'Kích hoạt'}
-                </button>
-              </div>
-            </td>
-          </tr>
-        );
-      })}
-    </tbody>
-  </table>
-</div>
+                return (
+                  <tr key={area.id} className={`
+                    hover:bg-gray-50 
+                    ${status.status === 'checking' ? 'bg-blue-50' : ''} 
+                    ${area.status === 'paused' ? 'bg-gray-50' : ''}
+                  `}>
+                    <td className="py-2 px-3">
+                      <div className="font-medium text-gray-900 truncate" title={area.name}>{area.name}</div>
+                      <div className="text-xs text-gray-500 truncate">ID: {area.id}</div>
+                    </td>
+                    
+                    <td className="py-2 px-3 text-sm text-gray-500 text-center">
+                      <div className="text-xs whitespace-nowrap"> 
+                        {((area.boundingBox.north + area.boundingBox.south) / 2).toFixed(2)},{((area.boundingBox.east + area.boundingBox.west) / 2).toFixed(2)}
+                      </div>
+                    </td>
+                    
+                    <td className="py-2 px-3 text-sm text-gray-500 text-center whitespace-nowrap">
+                      {formatFrequency(area.monitorFrequency)}
+                    </td>
+                    
+                    <td className="py-2 px-3 text-sm text-gray-500 text-center">
+                      <div className="whitespace-nowrap">{formatDate(area.lastChecked)}</div>
+                      
+                      {status.status === 'checking' && (
+                        <div className="text-xs text-blue-600 flex items-center justify-center mt-1">
+                          <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse mr-1"></div>
+                          <span className="whitespace-nowrap">Đang kiểm tra...</span>
+                        </div>
+                      )}
+                      
+                      {status.status === 'success' && detectedText && (
+                        <div className="text-xs text-green-600 mt-1 truncate" title={detectedText}>
+                          {detectedText}
+                        </div>
+                      )}
+                      
+                      {status.status === 'error' && status.message && (
+                        <div className="text-xs text-red-600 mt-1 truncate" title={status.message}>
+                          {status.message}
+                        </div>
+                      )}
+                    </td>
+                    
+                    <td className="py-2 px-3 text-sm text-gray-500 text-center">
+                      <div className={`truncate whitespace-nowrap ${area.status === 'paused' ? 'text-gray-400' : (shouldCheckNow(area.lastChecked, area.monitorFrequency) ? 'text-red-600 font-medium' : '')}`}>
+                        {area.status === 'paused' ? '—' : (shouldCheckNow(area.lastChecked, area.monitorFrequency) ? 'Đến hạn kiểm tra' : timeRemaining)}
+                      </div>
+                    </td>
+                    
+                    <td className="py-2 px-3 text-center">
+                      <div className="truncate" title={typeof renderDetectedPoints === 'function' ? 'Chi tiết phát hiện' : ''}>
+                        {renderDetectedPoints(area.detectedPoints)}
+                      </div>
+                    </td>
+                    
+                    <td className="py-2 px-3 text-center">
+                      <div className="truncate">
+                        {renderRiskLevel(area.riskLevel)}
+                      </div>
+                    </td>
+                    
+                    <td className="py-2 px-3 text-center">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap
+                        ${area.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                        {area.status === 'active' ? 'Đang theo dõi' : 'Tạm dừng'}
+                      </span>
+                    </td>
+                    
+                    <td className="py-2 px-3 text-center">
+                      <div className="flex justify-center space-x-1">
+                        <button 
+                          onClick={() => handleManualMonitoring(area.id)}
+                          disabled={status.status === 'checking' || area.status === 'paused'}
+                          className={`text-xs px-2 py-1 rounded 
+                            ${status.status === 'checking' || area.status === 'paused'
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                              : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
+                        >
+                          Kiểm tra
+                        </button>
+                        
+                        <button 
+                          className="text-xs px-2 py-1 rounded bg-gray-50 text-gray-700 hover:bg-gray-100"
+                        >
+                          Sửa
+                        </button>
+                        
+                        <button 
+                          onClick={() => handleToggleStatus(area.id)}
+                          className={`text-xs px-2 py-1 rounded 
+                            ${area.status === 'active' 
+                              ? 'bg-red-50 text-red-700 hover:bg-red-100' 
+                              : 'bg-green-50 text-green-700 hover:bg-green-100'}`}
+                        >
+                          {area.status === 'active' ? 'Dừng' : 'Kích hoạt'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {updatedAreas.length === 0 && (
+      {areasToDisplay.length === 0 && (
         <div className="text-center py-12">
           <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
           </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">Chưa có khu vực nào được giám sát</h3>
-          <p className="mt-1 text-sm text-gray-500">Hãy thêm khu vực theo dõi để nhận được cảnh báo sớm.</p>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">
+            {showPaused 
+              ? 'Chưa có khu vực nào được giám sát' 
+              : updatedAreas.filter(a => a.status === 'paused').length > 0 
+                ? 'Không có khu vực đang theo dõi' 
+                : 'Chưa có khu vực nào được giám sát'
+            }
+          </h3>
+          <p className="mt-1 text-sm text-gray-500">
+            {showPaused 
+              ? 'Hãy thêm khu vực theo dõi để nhận được cảnh báo sớm.'
+              : updatedAreas.filter(a => a.status === 'paused').length > 0 
+                ? 'Bạn có thể kích hoạt lại các khu vực đã dừng theo dõi hoặc thêm khu vực mới.'
+                : 'Hãy thêm khu vực theo dõi để nhận được cảnh báo sớm.'
+            }
+          </p>
           <div className="mt-6">
+            {updatedAreas.filter(a => a.status === 'paused').length > 0 && !showPaused && (
+              <button 
+                onClick={() => setShowPaused(true)}
+                className="mr-3 px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+              >
+                Xem khu vực đã dừng
+              </button>
+            )}
             <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
               Thêm khu vực mới
             </button>
