@@ -390,22 +390,35 @@ export default function MonitoringTable({ areas, onUpdateArea }: MonitoringTable
     if (!area) return;
     
     // Tạo một bản sao của khu vực với trạng thái đã cập nhật
+    const newStatus = area.status === 'active' ? 'paused' : 'active';
     const updatedArea: MonitoringArea = {
       ...area,
-      status: area.status === 'active' ? 'paused' : 'active'
+      status: newStatus
     };
     
     try {
-      let success = true;
+      // Hiển thị toast loading
+      toast.loading(
+        `Đang ${area.status === 'active' ? 'dừng' : 'kích hoạt'} khu vực: ${area.name}`,
+        { id: `status-${areaId}` }
+      );
       
-      // Gọi API để cập nhật trạng thái trong cơ sở dữ liệu (nếu có)
-      if (onUpdateArea) {
-        success = await onUpdateArea(updatedArea);
-      }
+      // Gọi API để cập nhật trạng thái trong cơ sở dữ liệu
+      const response = await fetch('/api/monitoring-update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: areaId,
+          status: newStatus
+        }),
+      });
       
-      if (!success) {
-        toast.error(`Không thể ${area.status === 'active' ? 'dừng' : 'kích hoạt'} khu vực: ${area.name}`);
-        return;
+      const result = await response.json();
+      
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Không thể cập nhật trạng thái');
       }
       
       // Cập nhật state cục bộ
@@ -414,7 +427,10 @@ export default function MonitoringTable({ areas, onUpdateArea }: MonitoringTable
       );
       
       // Hiển thị thông báo thành công
-      toast.success(`Đã ${area.status === 'active' ? 'dừng theo dõi' : 'kích hoạt theo dõi'} khu vực: ${area.name}`);
+      toast.success(
+        `Đã ${area.status === 'active' ? 'dừng theo dõi' : 'kích hoạt theo dõi'} khu vực: ${area.name}`,
+        { id: `status-${areaId}` }
+      );
       
       // Thêm thông báo mới vào danh sách
       const newNotification = {
@@ -429,7 +445,12 @@ export default function MonitoringTable({ areas, onUpdateArea }: MonitoringTable
       
     } catch (error) {
       console.error('Lỗi khi cập nhật trạng thái khu vực:', error);
-      toast.error(`Lỗi: Không thể cập nhật trạng thái khu vực ${area.name}`);
+      
+      // Hiển thị thông báo lỗi
+      toast.error(
+        `Lỗi: Không thể cập nhật trạng thái khu vực ${area.name}`,
+        { id: `status-${areaId}` }
+      );
     }
   };
 

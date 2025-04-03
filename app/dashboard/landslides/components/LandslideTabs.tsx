@@ -158,7 +158,10 @@ export default function LandslideTabs({
 
           {/* Panel 2: Theo dõi liên tục */}
           <Tab.Panel className="rounded-xl bg-white p-4 shadow">
-            <MonitoringTable areas={monitoredAreas} />
+            <MonitoringTable 
+              areas={monitoredAreas}
+              // No need to pass onUpdateArea prop since we're calling the API directly
+            />
           </Tab.Panel>
 
           {/* Panel 3: Thông báo & Cảnh báo */}

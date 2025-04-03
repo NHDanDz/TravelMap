@@ -34,6 +34,7 @@ export default function AddMonitoringModal({ landslide, onClose, onAddMonitoring
   const [autoVerify, setAutoVerify] = useState(false);
   const [loading, setLoading] = useState(false);
   const [boundingBox, setBoundingBox] = useState(defaultBoundingBox);
+  const [error, setError] = useState<string | null>(null);
   
   // Thêm state rủi ro mặc định
   const [riskLevel, setRiskLevel] = useState<'low' | 'medium' | 'high'>('medium');
@@ -41,8 +42,26 @@ export default function AddMonitoringModal({ landslide, onClose, onAddMonitoring
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
     try {
+      // Check if this landslide is already being monitored
+      const checkResponse = await fetch('/api/monitoring/exists', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ landslideId: landslide.id }),
+      });
+      
+      const checkResult = await checkResponse.json();
+      
+      if (checkResult.exists) {
+        setError(`Khu vực này đã được theo dõi với tên "${checkResult.area.name}"`);
+        setLoading(false);
+        return;
+      }
+      
       const now = new Date().toISOString();
       
       // Ensure all boundingBox values are explicitly set as strings
@@ -78,7 +97,7 @@ export default function AddMonitoringModal({ landslide, onClose, onAddMonitoring
       
     } catch (error) {
       console.error('Error adding monitoring area:', error);
-      alert('Có lỗi xảy ra khi thêm khu vực theo dõi!');
+      setError('Khu vực đã được theo dõi thường xuyên');
     } finally {
       setLoading(false);
     }
@@ -88,6 +107,12 @@ export default function AddMonitoringModal({ landslide, onClose, onAddMonitoring
     <Modal isOpen={true} onClose={onClose} title="Thêm vào danh sách theo dõi liên tục">
       <form onSubmit={handleSubmit}>
         <div className="p-4">
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg">
+              <p>{error}</p>
+            </div>
+          )}
+          
           <div className="mb-4 p-3 bg-blue-50 rounded-lg">
             <h3 className="text-sm font-medium text-blue-700">Thông tin sạt lở</h3>
             <div className="mt-2 grid grid-cols-2 gap-2 text-sm">

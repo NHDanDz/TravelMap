@@ -1,7 +1,7 @@
 // app/components/layout/Sidebar.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -9,11 +9,25 @@ interface NavItem {
   href: string;
   label: string;
   icon: React.ReactNode;
+  badge?: number | string;
+  subitems?: { href: string; label: string }[];
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen: boolean;
+}
+
+export function Sidebar({ isOpen }: SidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  
+  // Reset active group when sidebar opens or closes
+  useEffect(() => {
+    if (!isOpen) {
+      setActiveGroup(null);
+    }
+  }, [isOpen]);
 
   const navItems: NavItem[] = [
     {
@@ -32,7 +46,13 @@ export function Sidebar() {
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
         </svg>
-      )
+      ),
+      badge: 8,
+      subitems: [
+        { href: '/dashboard/landslides?tab=all', label: 'Tất cả điểm sạt lở' },
+        { href: '/dashboard/landslides?tab=monitoring', label: 'Theo dõi liên tục' },
+        { href: '/dashboard/landslides?tab=notifications', label: 'Thông báo & Cảnh báo' }
+      ]
     },
     {
       href: '/dashboard/Map',
@@ -59,48 +79,242 @@ export function Sidebar() {
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
-      )
+      ),
+      badge: 3
     }
   ];
 
+  // Group items for display
+  const mainNavItems = navItems.slice(0, 4);
+  const otherNavItems = navItems.slice(4);
+
+  // Check if path is active (exact match or starts with path for submenus)
+  const isActive = (path: string) => {
+    if (pathname === path) return true;
+    if (path !== '/dashboard' && pathname && pathname.startsWith(path)) return true;
+    return false;
+  };
+
+  // Toggle a submenu group
+  const toggleGroup = (href: string) => {
+    setActiveGroup(activeGroup === href ? null : href);
+  };
+
   return (
-    <aside className={`bg-white border-r border-gray-200 transition-all duration-300 ${collapsed ? 'w-16' : 'w-56'}`}>
-      <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200">
-        {!collapsed && <h2 className="text-lg font-semibold text-gray-800">Dashboard</h2>}
-        <button 
-          onClick={() => setCollapsed(!collapsed)} 
-          className="p-1 rounded-md text-gray-500 hover:bg-gray-100"
-        >
-          {collapsed ? (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-            </svg>
-          ) : (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-            </svg>
+    <aside 
+      className={`bg-white border-r border-gray-200 shadow-sm transition-all duration-300 z-20 ${
+        isOpen ? (collapsed ? 'w-16' : 'w-56') : 'w-0 translate-x-0'
+      } h-[calc(100vh-4rem)] overflow-hidden`}
+    >
+      <div className="flex flex-col h-full">
+        {/* Sidebar header */}
+        <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200">
+          {!collapsed && isOpen && (
+            <h2 className="text-lg font-semibold text-gray-800">
+              <span className="text-blue-600">Land</span>Monitor
+            </h2>
           )}
-        </button>
+          <button 
+            onClick={() => setCollapsed(!collapsed)} 
+            className={`p-2 rounded-md text-gray-500 hover:bg-gray-100 ${collapsed && 'mx-auto'}`}
+          >
+            {collapsed ? (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+              </svg>
+            )}
+          </button>
+        </div>
+        
+        {/* Main navigation */}
+        <div className="flex-1 py-6 overflow-y-auto scrollbar-thin">
+          {/* User info panel */}
+          {!collapsed && isOpen && (
+            <div className="px-4 mb-6">
+              <div className="p-3 bg-blue-50 rounded-lg flex items-center">
+                <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium">
+                  AU
+                </div>
+                <div className="ml-3">
+                  <div className="text-sm font-medium text-gray-900">Admin User</div>
+                  <div className="text-xs text-gray-500">Quản trị viên</div>
+                </div>
+              </div>
+            </div>
+          )}
+        
+          {/* Dashboard section */}
+          <div className="px-3 mb-6">
+            <div className={`${!collapsed && 'mb-2'}`}>
+              {!collapsed && isOpen && (
+                <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  Dashboard
+                </h3>
+              )}
+              <ul className="mt-2 space-y-1">
+                {mainNavItems.map((item) => (
+                  <li key={item.href}>
+                    {item.subitems ? (
+                      <div className="space-y-1">
+                        <button
+                          onClick={() => toggleGroup(item.href)}
+                          className={`flex items-center w-full px-3 py-2 text-sm rounded-md transition-colors duration-200 ${
+                            isActive(item.href)
+                              ? 'bg-blue-50 text-blue-700 font-medium'
+                              : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          <span className="inline-block mr-3">{item.icon}</span>
+                          {!collapsed && isOpen && (
+                            <>
+                              <span className="flex-1">{item.label}</span>
+                              {item.badge && (
+                                <span className="ml-3 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                  {item.badge}
+                                </span>
+                              )}
+                              <svg 
+                                className={`ml-2 w-4 h-4 transition-transform ${
+                                  activeGroup === item.href ? 'transform rotate-180' : ''
+                                }`} 
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24" 
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </>
+                          )}
+                          {collapsed && item.badge && (
+                            <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-red-500"></span>
+                          )}
+                        </button>
+                        
+                        {/* Subitems */}
+                        {!collapsed && isOpen && activeGroup === item.href && item.subitems && (
+                          <ul className="pl-10 pr-2 space-y-1">
+                            {item.subitems.map((subitem) => (
+                              <li key={subitem.href}>
+                                <Link
+                                  href={subitem.href}
+                                  className={`block px-3 py-2 text-sm rounded-md ${
+                                    pathname === subitem.href
+                                      ? 'bg-blue-50 text-blue-700 font-medium'
+                                      : 'text-gray-600 hover:bg-gray-100'
+                                  }`}
+                                >
+                                  {subitem.label}
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ) : (
+                      <Link
+                        href={item.href}
+                        className={`flex items-center px-3 py-2 text-sm rounded-md transition-colors duration-200 ${
+                          isActive(item.href)
+                            ? 'bg-blue-50 text-blue-700 font-medium'
+                            : 'text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        <span className={`inline-block ${!collapsed && 'mr-3'}`}>{item.icon}</span>
+                        {!collapsed && isOpen && (
+                          <>
+                            <span>{item.label}</span>
+                            {item.badge && (
+                              <span className="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                {item.badge}
+                              </span>
+                            )}
+                          </>
+                        )}
+                        {collapsed && item.badge && (
+                          <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-red-500"></span>
+                        )}
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            
+            {/* Settings section */}
+            {!collapsed && isOpen && (
+              <div>
+                <h3 className="px-3 mt-8 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  Quản trị
+                </h3>
+                <ul className="mt-2 space-y-1">
+                  {otherNavItems.map((item) => (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        className={`flex items-center px-3 py-2 text-sm rounded-md transition-colors duration-200 ${
+                          isActive(item.href)
+                            ? 'bg-blue-50 text-blue-700 font-medium'
+                            : 'text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        <span className="inline-block mr-3">{item.icon}</span>
+                        <span>{item.label}</span>
+                        {item.badge && (
+                          <span className="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            {item.badge}
+                          </span>
+                        )}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            {/* Collapsed mode for settings */}
+            {collapsed && isOpen && (
+              <ul className="mt-8 space-y-1">
+                {otherNavItems.map((item) => (
+                  <li key={item.href} className="relative">
+                    <Link
+                      href={item.href}
+                      className={`flex justify-center items-center p-3 text-sm rounded-md transition-colors duration-200 ${
+                        isActive(item.href)
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <span>{item.icon}</span>
+                      {item.badge && (
+                        <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-red-500"></span>
+                      )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+        
+        {/* Sidebar footer */}
+        {!collapsed && isOpen && (
+          <div className="p-4 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-xs text-gray-500">Hệ thống hoạt động</span>
+              </div>
+              <button className="text-xs text-blue-600 hover:text-blue-700">
+                Trợ giúp
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-      <nav className="py-4">
-        <ul className="space-y-1">
-          {navItems.map((item) => (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                className={`flex items-center px-4 py-2 text-sm ${
-                  pathname === item.href 
-                    ? 'bg-blue-50 text-blue-700 border-r-4 border-blue-500' 
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <span className="mr-3">{item.icon}</span>
-                {!collapsed && <span>{item.label}</span>}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
     </aside>
   );
 }
