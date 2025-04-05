@@ -1,62 +1,77 @@
 // components/SearchFilters.tsx
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Search, Loader2, Filter } from 'lucide-react';
 import * as Accordion from '@radix-ui/react-accordion';
 import * as Slider from '@radix-ui/react-slider';
-import { MapFilters } from '@/types/map'; 
+import { PlaceType } from '../types';
 import { 
-    Coffee, Hotel, Utensils, Landmark, Beer, Pizza, 
-    UtensilsCrossed, Sandwich, School, Building2, Church,
-    Music, ShoppingBag, Store, Building, HeartPulse
-  } from 'lucide-react';
+  Coffee, Hotel, Utensils, Landmark, Beer, Pizza, 
+  UtensilsCrossed, Sandwich, Building2, Church,
+  Music, ShoppingBag, Store, Building, HeartPulse
+} from 'lucide-react';
 import debounce from 'lodash/debounce';
-'/node_modules/lodash/debounce.js'
+
+interface MapFilters {
+  placeType: PlaceType;
+  radius: number;
+  minRating: number;
+}
 
 interface PlaceTypeOption {
-    value: string;
-    label: string;
-    icon: React.ReactNode;
-    category: string;
+  value: PlaceType;
+  label: string;
+  icon: React.ReactNode;
+  category: string;
+}
+
+const placeTypes: PlaceTypeOption[] = [
+  // Ẩm thực
+  { category: 'Ẩm thực', value: 'restaurant', label: 'Nhà hàng', icon: <Utensils className="w-4 h-4" /> },
+  { category: 'Ẩm thực', value: 'fast_food', label: 'Đồ ăn nhanh', icon: <Pizza className="w-4 h-4" /> },
+  { category: 'Ẩm thực', value: 'cafe', label: 'Quán café', icon: <Coffee className="w-4 h-4" /> },
+  { category: 'Ẩm thực', value: 'bar', label: 'Quán bar', icon: <Beer className="w-4 h-4" /> },
+  { category: 'Ẩm thực', value: 'food_court', label: 'Khu ẩm thực', icon: <UtensilsCrossed className="w-4 h-4" /> },
+  { category: 'Ẩm thực', value: 'street_food', label: 'Đồ ăn đường phố', icon: <Sandwich className="w-4 h-4" /> },
+
+  // Lưu trú
+  { category: 'Lưu trú', value: 'hotel', label: 'Khách sạn', icon: <Hotel className="w-4 h-4" /> },
+  { category: 'Lưu trú', value: 'hostel', label: 'Nhà nghỉ', icon: <Building className="w-4 h-4" /> },
+  { category: 'Lưu trú', value: 'apartment', label: 'Căn hộ', icon: <Building2 className="w-4 h-4" /> },
+  { category: 'Lưu trú', value: 'guest_house', label: 'Nhà khách', icon: <Building className="w-4 h-4" /> },
+
+  // Du lịch & Văn hóa
+  { category: 'Du lịch & Văn hóa', value: 'tourist_attraction', label: 'Điểm du lịch', icon: <Landmark className="w-4 h-4" /> },
+  { category: 'Du lịch & Văn hóa', value: 'museum', label: 'Bảo tàng', icon: <Building2 className="w-4 h-4" /> },
+  { category: 'Du lịch & Văn hóa', value: 'temple', label: 'Đền/Chùa', icon: <Church className="w-4 h-4" /> },
+  { category: 'Du lịch & Văn hóa', value: 'historic', label: 'Di tích lịch sử', icon: <Landmark className="w-4 h-4" /> },
+  { category: 'Du lịch & Văn hóa', value: 'viewpoint', label: 'Điểm ngắm cảnh', icon: <Landmark className="w-4 h-4" /> },
+
+  // Giải trí
+  { category: 'Giải trí', value: 'entertainment', label: 'Khu vui chơi', icon: <Music className="w-4 h-4" /> },
+  { category: 'Giải trí', value: 'cinema', label: 'Rạp chiếu phim', icon: <Music className="w-4 h-4" /> },
+  { category: 'Giải trí', value: 'karaoke', label: 'Karaoke', icon: <Music className="w-4 h-4" /> },
+
+  // Mua sắm
+  { category: 'Mua sắm', value: 'mall', label: 'Trung tâm thương mại', icon: <ShoppingBag className="w-4 h-4" /> },
+  { category: 'Mua sắm', value: 'supermarket', label: 'Siêu thị', icon: <Store className="w-4 h-4" /> },
+  { category: 'Mua sắm', value: 'market', label: 'Chợ', icon: <Store className="w-4 h-4" /> },
+
+  // Y tế & Sức khỏe
+  { category: 'Y tế & Sức khỏe', value: 'hospital', label: 'Bệnh viện', icon: <HeartPulse className="w-4 h-4" /> },
+  { category: 'Y tế & Sức khỏe', value: 'pharmacy', label: 'Nhà thuốc', icon: <HeartPulse className="w-4 h-4" /> },
+];
+
+// Nhóm các loại địa điểm theo category
+const groupedPlaceTypes = placeTypes.reduce((acc, place) => {
+  if (!acc[place.category]) {
+    acc[place.category] = [];
   }
-  
-  const placeTypes: PlaceTypeOption[] = [
-    // Ẩm thực
-    { category: 'Ẩm thực', value: 'restaurant', label: 'Nhà hàng', icon: <Utensils className="w-4 h-4" /> },
-    { category: 'Ẩm thực', value: 'fast_food', label: 'Đồ ăn nhanh', icon: <Pizza className="w-4 h-4" /> },
-    { category: 'Ẩm thực', value: 'cafe', label: 'Quán café', icon: <Coffee className="w-4 h-4" /> },
-    { category: 'Ẩm thực', value: 'bar', label: 'Quán bar', icon: <Beer className="w-4 h-4" /> },
-    { category: 'Ẩm thực', value: 'food_court', label: 'Khu ẩm thực', icon: <UtensilsCrossed className="w-4 h-4" /> },
-    { category: 'Ẩm thực', value: 'street_food', label: 'Đồ ăn đường phố', icon: <Sandwich className="w-4 h-4" /> },
-  
-    // Lưu trú
-    { category: 'Lưu trú', value: 'hotel', label: 'Khách sạn', icon: <Hotel className="w-4 h-4" /> },
-    { category: 'Lưu trú', value: 'hostel', label: 'Nhà nghỉ', icon: <Building className="w-4 h-4" /> },
-    { category: 'Lưu trú', value: 'apartment', label: 'Căn hộ', icon: <Building2 className="w-4 h-4" /> },
-    { category: 'Lưu trú', value: 'guest_house', label: 'Nhà khách', icon: <Building className="w-4 h-4" /> },
-  
-    // Du lịch & Văn hóa
-    { category: 'Du lịch & Văn hóa', value: 'tourist_attraction', label: 'Điểm du lịch', icon: <Landmark className="w-4 h-4" /> },
-    { category: 'Du lịch & Văn hóa', value: 'museum', label: 'Bảo tàng', icon: <Building2 className="w-4 h-4" /> },
-    { category: 'Du lịch & Văn hóa', value: 'temple', label: 'Đền/Chùa', icon: <Church className="w-4 h-4" /> },
-    { category: 'Du lịch & Văn hóa', value: 'historic', label: 'Di tích lịch sử', icon: <Landmark className="w-4 h-4" /> },
-    { category: 'Du lịch & Văn hóa', value: 'viewpoint', label: 'Điểm ngắm cảnh', icon: <Landmark className="w-4 h-4" /> },
-  
-    // Giải trí
-    { category: 'Giải trí', value: 'entertainment', label: 'Khu vui chơi', icon: <Music className="w-4 h-4" /> },
-    { category: 'Giải trí', value: 'cinema', label: 'Rạp chiếu phim', icon: <Music className="w-4 h-4" /> },
-    { category: 'Giải trí', value: 'karaoke', label: 'Karaoke', icon: <Music className="w-4 h-4" /> },
-  
-    // Mua sắm
-    { category: 'Mua sắm', value: 'mall', label: 'Trung tâm thương mại', icon: <ShoppingBag className="w-4 h-4" /> },
-    { category: 'Mua sắm', value: 'supermarket', label: 'Siêu thị', icon: <Store className="w-4 h-4" /> },
-    { category: 'Mua sắm', value: 'market', label: 'Chợ', icon: <Store className="w-4 h-4" /> },
-  
-    // Y tế & Sức khỏe
-    { category: 'Y tế & Sức khỏe', value: 'hospital', label: 'Bệnh viện', icon: <HeartPulse className="w-4 h-4" /> },
-    { category: 'Y tế & Sức khỏe', value: 'pharmacy', label: 'Nhà thuốc', icon: <HeartPulse className="w-4 h-4" /> },
-  ];
+  acc[place.category].push(place);
+  return acc;
+}, {} as Record<string, PlaceTypeOption[]>);
+
 interface SearchFiltersProps {
   filters: MapFilters;
   onFiltersChange: (filters: MapFilters) => void;
@@ -148,10 +163,10 @@ export default function SearchFilters({
             </Accordion.Trigger>
             <Accordion.Content className="p-2">
               <div className="grid grid-cols-2 gap-2">
-                {Object.entries(placeTypes).map(([category, types]) => (
+                {Object.entries(groupedPlaceTypes).map(([category, items]) => (
                   <div key={category}>
                     <h4 className="font-medium text-sm mb-1">{category}</h4>
-                    {types.map(type => (
+                    {items.map(type => (
                       <label
                         key={type.value}
                         className="flex items-center gap-2 text-sm py-1"

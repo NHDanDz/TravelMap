@@ -1,10 +1,11 @@
 // types.ts
 export interface Place {
+  id?: string;
   name: string;
   latitude: string;
   longitude: string;
   rating: string;
-  type: string;
+  type: PlaceType;
   photo?: {
     images: {
       large: {
@@ -23,6 +24,7 @@ export interface PlaceDetails {
   website?: string;
   description?: string;
   address?: string;
+  price_level?: string;
 
   // Thông tin tiện nghi
   capacity?: string;           // Sức chứa
