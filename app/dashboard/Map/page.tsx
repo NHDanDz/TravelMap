@@ -172,45 +172,7 @@ const MapPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* Top Navigation */}
-      <header className="bg-white shadow-sm z-10">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="text-xl font-bold text-blue-600 flex items-center">
-                <Compass className="w-6 h-6 mr-2" />
-                TravelSense
-              </div>
-            </div>
-            
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center space-x-6">
-              <a href="/dashboard/Map" className="text-sm font-medium text-blue-600">
-                Khám phá
-              </a>
-              <a href="#" className="text-sm font-medium text-gray-600 hover:text-gray-900">
-                Lịch trình
-              </a>
-              <a href="#" className="text-sm font-medium text-gray-600 hover:text-gray-900">
-                Đã lưu
-              </a>
-              <a href="#" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
-                Đăng nhập
-              </a>
-            </nav>
-            
-            {/* Mobile Menu Button */}
-            <button 
-              className="md:hidden text-gray-600 focus:outline-none"
-              onClick={() => setShowMobileFilters(!showMobileFilters)}
-            >
-              {showMobileFilters ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
+      {/* Main Content - Removed duplicate header */}
       <div className="flex-1 flex flex-col md:flex-row">
         {/* Sidebar */}
         <div className={`${showSidebar ? 'w-full md:w-1/4' : 'hidden'} bg-white shadow-sm overflow-auto z-10 md:min-h-[calc(100vh-64px)] md:max-h-[calc(100vh-64px)]`}>
