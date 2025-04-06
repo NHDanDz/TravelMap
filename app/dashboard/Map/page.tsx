@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 
 // Client-only component wrapper
-const ClientOnly = ({ children }) => {
+const ClientOnly = ({ children }: { children: React.ReactNode }) => {
   const [hasMounted, setHasMounted] = useState(false);
   
   useEffect(() => {

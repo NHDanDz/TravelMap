@@ -15,7 +15,7 @@ import {
 import dynamic from 'next/dynamic';
 
 // Separate client component for handling script imports
-const ClientOnly = ({ children }) => {
+const ClientOnly = ({ children }: { children: React.ReactNode }) => {
   const [isMounted, setIsMounted] = useState(false);
   
   useEffect(() => {
