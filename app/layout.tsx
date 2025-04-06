@@ -2,7 +2,6 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import '@/app/ui/global.css';
-import Script from 'next/script';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -18,20 +17,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <head>
-        <Script
-          src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
-          integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
-          crossOrigin=""
-          strategy="beforeInteractive"
-        />
-        <link
-          rel="stylesheet"
-          href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
-          integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
-          crossOrigin=""
-        />
-      </head>
+      {/* Không thêm thẻ Script vào đây nữa - sẽ chuyển vào head hoặc dashboard layout để tránh conflict */}
       <body className={`${inter.className} antialiased`}>{children}</body>
     </html>
   );
