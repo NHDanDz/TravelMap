@@ -13,15 +13,22 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Giữ nguyên cấu hình experimental
+  // Configure experimental features
   experimental: {
-    ppr: 'incremental'
+    ppr: 'incremental',
+    // Enable Turbopack for development
+    turbo: {
+      // Turbopack specific rules
+      rules: {
+        // Include your custom rules here if needed
+      },
+      // Resolve aliases if needed
+      resolveAlias: {
+        // Example: Map a module to another module
+        // 'module-name': 'actual-module-name'
+      },
+    }
   },
-  // Thêm webpack config nếu cần thiết
-  webpack: (config) => {
-    // Nếu cần thêm cấu hình webpack
-    return config;
-  }
 };
 
 export default nextConfig;

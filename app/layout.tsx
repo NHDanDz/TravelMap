@@ -17,7 +17,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      {/* Không thêm thẻ Script vào đây nữa - sẽ chuyển vào head hoặc dashboard layout để tránh conflict */}
+      <head>
+        {/* Base meta tags only - no scripts or CSS here */}
+      </head>
       <body className={`${inter.className} antialiased`}>{children}</body>
     </html>
   );

@@ -1,7 +1,7 @@
 // app/dashboard/layout.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Compass, 
@@ -12,10 +12,24 @@ import {
   X,
   LogOut
 } from 'lucide-react';
-// Sửa đường dẫn import - Đường dẫn tuyệt đối thay vì tương đối
 import dynamic from 'next/dynamic';
 
-// Import ScriptImports động để tránh lỗi
+// Separate client component for handling script imports
+const ClientOnly = ({ children }) => {
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+  
+  if (!isMounted) {
+    return null; // Return null on initial server render
+  }
+  
+  return <>{children}</>;
+};
+
+// Import ScriptImports with client-side only rendering
 const ScriptImporter = dynamic(
   () => import('@/app/dashboard/Map/ScriptImports'),
   { ssr: false }
@@ -27,11 +41,19 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  
+  // Handle client-side-only code
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Thêm các script cần thiết cho Leaflet */}
-      {typeof window !== 'undefined' && <ScriptImporter />}
+      {/* Only include client-side scripts when in browser */}
+      <ClientOnly>
+        <ScriptImporter />
+      </ClientOnly>
       
       {/* Header */}
       <header className="bg-white shadow-sm z-20 relative">
@@ -73,7 +95,7 @@ export default function DashboardLayout({
         </div>
         
         {/* Mobile Navigation Menu */}
-        {showMobileMenu && (
+        {isMounted && showMobileMenu && (
           <div className="md:hidden bg-white border-t border-gray-100 px-4 py-3 space-y-3 absolute w-full z-10 shadow-md">
             <Link 
               href="/dashboard" 
@@ -149,37 +171,39 @@ export default function DashboardLayout({
         </div>
       </footer>
       
-      {/* Mobile Bottom Navigation */}
-      <div className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-20">
-        <div className="grid grid-cols-4 h-16">
-          <Link
-            href="/dashboard"
-            className="flex flex-col items-center justify-center text-gray-600 hover:text-blue-600"
-          >
-            <Compass className="h-6 w-6" />
-            <span className="text-xs mt-1">Trang chủ</span>
-          </Link>
-          <Link
-            href="/dashboard/Map"
-            className="flex flex-col items-center justify-center text-gray-600 hover:text-blue-600"
-          >
-            <Map className="h-6 w-6" />
-            <span className="text-xs mt-1">Bản đồ</span>
-          </Link>
-          <button
-            className="flex flex-col items-center justify-center text-gray-600 hover:text-blue-600"
-          >
-            <Heart className="h-6 w-6" />
-            <span className="text-xs mt-1">Đã lưu</span>
-          </button>
-          <button
-            className="flex flex-col items-center justify-center text-gray-600 hover:text-blue-600"
-          >
-            <User className="h-6 w-6" />
-            <span className="text-xs mt-1">Tài khoản</span>
-          </button>
+      {/* Mobile Bottom Navigation - Only rendered client-side */}
+      {isMounted && (
+        <div className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-20">
+          <div className="grid grid-cols-4 h-16">
+            <Link
+              href="/dashboard"
+              className="flex flex-col items-center justify-center text-gray-600 hover:text-blue-600"
+            >
+              <Compass className="h-6 w-6" />
+              <span className="text-xs mt-1">Trang chủ</span>
+            </Link>
+            <Link
+              href="/dashboard/Map"
+              className="flex flex-col items-center justify-center text-gray-600 hover:text-blue-600"
+            >
+              <Map className="h-6 w-6" />
+              <span className="text-xs mt-1">Bản đồ</span>
+            </Link>
+            <button
+              className="flex flex-col items-center justify-center text-gray-600 hover:text-blue-600"
+            >
+              <Heart className="h-6 w-6" />
+              <span className="text-xs mt-1">Đã lưu</span>
+            </button>
+            <button
+              className="flex flex-col items-center justify-center text-gray-600 hover:text-blue-600"
+            >
+              <User className="h-6 w-6" />
+              <span className="text-xs mt-1">Tài khoản</span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
