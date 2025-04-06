@@ -6,8 +6,8 @@ import '@/app/ui/global.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Travel Map App',
-  description: 'Discover places around you',
+  title: 'TravelSense - Khám phá địa điểm tuyệt vời',
+  description: 'Nền tảng du lịch thông minh giúp bạn khám phá những địa điểm tuyệt vời xung quanh bạn.',
 };
 
 export default function RootLayout({
@@ -16,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="vi">
       <head>
         {/* Base meta tags only - no scripts or CSS here */}
       </head>
