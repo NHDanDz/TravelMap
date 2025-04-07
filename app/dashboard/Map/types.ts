@@ -1,4 +1,4 @@
-// types.ts
+// app/dashboard/Map/types.ts
 export interface Place {
   id?: string;
   name: string;
@@ -11,39 +11,88 @@ export interface Place {
       large: {
         url: string;
       };
+      medium?: {
+        url: string;
+      };
+      small?: {
+        url: string;
+      };
     };
+    caption?: string;
+    author?: string;
+    date?: string;
   };
   details?: PlaceDetails;
 }
 
 export interface PlaceDetails {
-  // Thông tin cơ bản
-  cuisine?: string;
-  openingHours?: string;
-  phone?: string;
-  website?: string;
+  // Basic information
   description?: string;
   address?: string;
   price_level?: string;
-
-  // Thông tin tiện nghi
-  capacity?: string;           // Sức chứa
-  wheelchair?: string;         // Tiếp cận cho người khuyết tật
-  internet_access?: string;    // WiFi/Internet
-  outdoor_seating?: string;    // Chỗ ngồi ngoài trời
+  rating_count?: number;
   
-  // Dịch vụ
-  takeaway?: string;          // Đồ ăn mang về
-  delivery?: string;          // Giao hàng
-  drive_through?: string;     // Dịch vụ drive-through
+  // Contact information
+  phone?: string;
+  website?: string;
+  email?: string;
   
-  // Tiện nghi khác
-  smoking?: string;           // Khu vực hút thuốc
-  air_conditioning?: string;  // Điều hòa
+  // Opening hours
+  openingHours?: string;
+  
+  // Specific details by category
+  cuisine?: string;              // For restaurants and cafes
+  hotel_class?: string;          // For hotels
+  room_types?: string[];         // For hotels
+  
+  // Features and amenities
+  features?: string[];
+  
+  // Accessibility
+  wheelchair?: string;           // Wheelchair accessibility
+  
+  // Services
+  internet_access?: string;      // WiFi/Internet
+  outdoor_seating?: string;      // Outdoor seating
+  takeaway?: string;             // Takeout available
+  delivery?: string;             // Delivery service
+  
+  // Comfort
+  smoking?: string;              // Smoking area
+  air_conditioning?: string;     // Air conditioning
+  
+  // Location
+  neighborhood?: string;         // Area/neighborhood
+  nearby_transit?: string;       // Nearby public transportation
+  
+  // Reviews and ratings
+  reviews?: Review[];
+  
+  // Photos
+  additional_photos?: Photo[];
 }
 
+export interface Review {
+  id: string;
+  author: string;
+  date: string;
+  rating: number;
+  title?: string;
+  content: string;
+  photos?: Photo[];
+}
+
+export interface Photo {
+  id: string;
+  url: string;
+  caption?: string;
+  author?: string;
+  date?: string;
+}
+
+// Place types - more organized by category
 export type PlaceType =
-  // Ẩm thực
+  // Dining
   | 'restaurant'
   | 'fast_food'
   | 'cafe'
@@ -51,50 +100,49 @@ export type PlaceType =
   | 'food_court'
   | 'street_food'
   
-  // Lưu trú
+  // Accommodation
   | 'hotel'
   | 'hostel'
   | 'apartment'
   | 'guest_house'
   
-  // Du lịch & Văn hóa
+  // Tourism & Culture
   | 'tourist_attraction'
   | 'museum'
   | 'temple'
   | 'historic'
   | 'viewpoint'
   
-  // Giải trí
+  // Entertainment
   | 'entertainment'
   | 'cinema'
   | 'karaoke'
   
-  // Mua sắm
+  // Shopping
   | 'mall'
   | 'supermarket'
   | 'market'
   
-  // Y tế & Sức khỏe
+  // Healthcare
   | 'hospital'
   | 'pharmacy';
 
-export interface PlaceTypeOption {
-  value: PlaceType;
-  label: string;
-  icon: React.ReactNode;
-  category: string;
-}
-
-export interface MapComponentProps {
-  places: Place[];
-  onLocationSelect?: (lat: number, lng: number) => void;
-}
-
-export interface NearbyPlacesProps {
-  selectedLocation: { lat: number; lng: number } | null;
+// Additional interfaces for the map components
+export interface MapFilters {
   placeType: PlaceType;
-  searchRadius: string;
-  onPlaceTypeChange: (type: PlaceType) => void;
-  onRadiusChange: (radius: string) => void;
-  isSearching: boolean;
+  radius: number; // in meters
+  minRating?: number;
+  priceLevel?: string[];
+  openNow?: boolean;
+  features?: string[];
+}
+
+export interface MapState {
+  center: [number, number];
+  zoom: number;
+  selectedLocation: [number, number] | null;
+  places: Place[];
+  selectedPlace: Place | null;
+  isLoading: boolean;
+  error: string | null;
 }
