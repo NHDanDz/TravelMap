@@ -2,45 +2,19 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Source, Layer, useMap } from 'react-map-gl';
-import type { Map as MapboxMap } from 'mapbox-gl';
+import { Source, Layer } from 'react-map-gl';
 import { Clock, Navigation, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface DirectionsProps {
-  startPoint: [number, number];
-  endPoint: [number, number];
-  mode?: 'driving' | 'walking' | 'cycling';
+  startPoint: [number, number]; // [longitude, latitude]
+  endPoint: [number, number]; // [longitude, latitude]
+  mode: 'driving' | 'walking' | 'cycling';
 }
 
 interface RouteStep {
+  instruction: string;
   distance: number;
   duration: number;
-  instruction: string;
-}
-
-interface DirectionsResponse {
-  routes: Array<{
-    distance: number;
-    duration: number;
-    geometry: {
-      coordinates: [number, number][];
-      type: string;
-    };
-    legs: Array<{
-      steps: Array<{
-        distance: number;
-        duration: number;
-        geometry: {
-          coordinates: [number, number][];
-          type: string;
-        };
-        maneuver: {
-          location: [number, number];
-          instruction: string;
-        };
-      }>;
-    }>;
-  }>;
 }
 
 const MapboxDirections: React.FC<DirectionsProps> = ({ 
@@ -48,9 +22,7 @@ const MapboxDirections: React.FC<DirectionsProps> = ({
   endPoint, 
   mode = 'walking' 
 }) => {
-  // Get map instance
-  const { current: map } = useMap() as { current: MapboxMap | undefined };
-  const [routeData, setRouteData] = useState<any>(null);
+  const [routeData, setRouteData] = useState<GeoJSON.Feature | null>(null);
   const [steps, setSteps] = useState<RouteStep[]>([]);
   const [totalDistance, setTotalDistance] = useState<number>(0);
   const [totalDuration, setTotalDuration] = useState<number>(0);
@@ -72,20 +44,14 @@ const MapboxDirections: React.FC<DirectionsProps> = ({
           throw new Error('Mapbox access token is missing');
         }
 
-        // Mapbox expects coordinates as [longitude, latitude]
-        const startLng = startPoint[1];
-        const startLat = startPoint[0];
-        const endLng = endPoint[1]; 
-        const endLat = endPoint[0];
-        
-        const url = `https://api.mapbox.com/directions/v5/mapbox/${mode}/${startLng},${startLat};${endLng},${endLat}?steps=true&geometries=geojson&access_token=${token}`;
+        const url = `https://api.mapbox.com/directions/v5/mapbox/${mode}/${startPoint[0]},${startPoint[1]};${endPoint[0]},${endPoint[1]}?steps=true&geometries=geojson&access_token=${token}`;
         
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`Failed to fetch directions: ${response.statusText}`);
         }
         
-        const data: DirectionsResponse = await response.json();
+        const data = await response.json();
         
         if (data.routes && data.routes.length > 0) {
           const route = data.routes[0];
@@ -97,45 +63,19 @@ const MapboxDirections: React.FC<DirectionsProps> = ({
             geometry: route.geometry
           };
           
-          setRouteData(routeGeoJson);
+          setRouteData(routeGeoJson as any);
           setTotalDistance(route.distance);
           setTotalDuration(route.duration);
           
           // Extract steps from the route
           if (route.legs && route.legs.length > 0) {
-            const routeSteps = route.legs[0].steps.map(step => ({
+            const routeSteps = route.legs[0].steps.map((step: any) => ({
+              instruction: step.maneuver.instruction,
               distance: step.distance,
-              duration: step.duration,
-              instruction: step.maneuver.instruction
+              duration: step.duration
             }));
             
             setSteps(routeSteps);
-          }
-          
-          // Adjust the map to show the entire route
-          if (map && route.geometry.coordinates.length > 0) {
-            const coordinates = route.geometry.coordinates;
-            const bounds = coordinates.reduce((bounds: any, coord) => {
-              return {
-                sw: [
-                  Math.min(bounds.sw[0], coord[0]),
-                  Math.min(bounds.sw[1], coord[1])
-                ],
-                ne: [
-                  Math.max(bounds.ne[0], coord[0]),
-                  Math.max(bounds.ne[1], coord[1])
-                ]
-              };
-            }, {
-              sw: [coordinates[0][0], coordinates[0][1]],
-              ne: [coordinates[0][0], coordinates[0][1]]
-            });
-            
-            // Use any type assertion to bypass TypeScript error
-            (map as any).fitBounds(
-              [bounds.sw, bounds.ne],
-              { padding: 80, duration: 1000 }
-            );
           }
         } else {
           setError('No routes found');
@@ -149,7 +89,7 @@ const MapboxDirections: React.FC<DirectionsProps> = ({
     };
 
     fetchDirections();
-  }, [startPoint, endPoint, mode, map]);
+  }, [startPoint, endPoint, mode]);
 
   // Format distance for display
   const formatDistance = (meters: number) => {
@@ -167,34 +107,33 @@ const MapboxDirections: React.FC<DirectionsProps> = ({
     
     if (hours > 0) {
       const remainingMinutes = minutes % 60;
-      return `${hours} hr ${remainingMinutes} min`;
+      return `${hours} giờ ${remainingMinutes} phút`;
     } else {
-      return `${minutes} min`;
+      return `${minutes} phút`;
     }
   };
 
-  // Layer style for the route line
-  const routeLayer = {
-    id: 'route',
-    type: 'line',
-    layout: {
-      'line-join': 'round',
-      'line-cap': 'round'
-    },
-    paint: {
-      'line-color': mode === 'driving' ? '#3b82f6' : 
-                    mode === 'cycling' ? '#10b981' : '#f59e0b',
-      'line-width': 5,
-      'line-opacity': 0.8
-    }
-  };
+  if (!routeData && !loading && !error) return null;
 
   return (
     <>
       {/* Route Line on Map */}
       {routeData && (
         <Source id="route-source" type="geojson" data={routeData}>
-          <Layer {...routeLayer as any} />
+          <Layer
+            id="route"
+            type="line"
+            layout={{
+              'line-join': 'round',
+              'line-cap': 'round'
+            }}
+            paint={{
+              'line-color': mode === 'driving' ? '#3b82f6' : 
+                          mode === 'cycling' ? '#10b981' : '#f59e0b',
+              'line-width': 5,
+              'line-opacity': 0.8
+            }}
+          />
         </Source>
       )}
       
@@ -207,7 +146,7 @@ const MapboxDirections: React.FC<DirectionsProps> = ({
           <div className="flex items-center gap-2">
             <Navigation className="w-5 h-5" />
             <div>
-              <h3 className="font-medium">Directions</h3>
+              <h3 className="font-medium">Chỉ đường</h3>
               {!loading && totalDistance > 0 && (
                 <div className="text-xs flex items-center gap-1">
                   <span>{formatDistance(totalDistance)}</span>
@@ -248,7 +187,7 @@ const MapboxDirections: React.FC<DirectionsProps> = ({
                 ))}
               </div>
             ) : (
-              <p className="text-center text-gray-500 p-4">No directions available</p>
+              <p className="text-center text-gray-500 p-4">Không có dữ liệu chỉ đường</p>
             )}
           </div>
         )}

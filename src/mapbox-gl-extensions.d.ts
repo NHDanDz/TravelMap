@@ -16,6 +16,7 @@ declare global {
 // Extend the Map type to include flyTo and other missing methods
 declare module 'mapbox-gl' {
   interface Map {
+    getCenter(): { lng: number; lat: number };
     flyTo(options: {
       center: [number, number];
       zoom?: number;
