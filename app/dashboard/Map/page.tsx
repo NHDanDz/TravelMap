@@ -4,17 +4,16 @@
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Compass } from 'lucide-react';
-import { Place, PlaceType } from './types';
 
-// Lazy-load map component
-const DynamicEnhancedMapboxMap = dynamic(
+// Lazy-load map component to avoid SSR issues
+const DynamicMapComponent = dynamic(
   () => import('./components/EnhancedMapboxMap'),
   { 
     ssr: false,
     loading: () => (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
-        <div className="text-center">
-          <Compass className="w-16 h-16 text-green-500 mx-auto mb-4 animate-pulse" />
+      <div className="flex items-center justify-center h-full w-full bg-gray-50">
+        <div className="text-center p-4">
+          <Compass className="w-16 h-16 text-blue-500 mx-auto mb-4 animate-pulse" />
           <h1 className="text-2xl font-bold text-gray-800 mb-2">TravelSense</h1>
           <p className="text-gray-600">Đang tải bản đồ tương tác...</p>
         </div>
@@ -46,13 +45,14 @@ export default function MapPage() {
   }, []);
   
   return (
-    <div className="h-screen w-full">
+    // Important: This div needs to have a fixed height and position
+    <div className="relative w-full h-[calc(100vh-64px)]">
       {userLocation ? (
-        <DynamicEnhancedMapboxMap initialLocation={userLocation} />
+        <DynamicMapComponent initialLocation={userLocation} />
       ) : (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
-          <div className="text-center">
-            <Compass className="w-16 h-16 text-green-500 mx-auto mb-4 animate-pulse" />
+        <div className="flex items-center justify-center h-full w-full bg-gray-50">
+          <div className="text-center p-4">
+            <Compass className="w-16 h-16 text-blue-500 mx-auto mb-4 animate-pulse" />
             <h1 className="text-2xl font-bold text-gray-800 mb-2">TravelSense</h1>
             <p className="text-gray-600">Đang xác định vị trí của bạn...</p>
           </div>
