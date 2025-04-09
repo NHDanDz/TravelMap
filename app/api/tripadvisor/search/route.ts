@@ -1,5 +1,6 @@
+// app/api/tripadvisor/search/route.ts (Updated)
 import { NextResponse } from 'next/server';
-import { TripadvisorService } from '@/services/tripAdvisorService';
+import { TripAdvisorService } from '@/services/tripAdvisorService';
 import { PlaceType } from '@/app/dashboard/Map/types';
 
 export async function GET(request: Request) {
@@ -13,69 +14,100 @@ export async function GET(request: Request) {
       );
     }
 
+    // Parse query parameters
     const { searchParams } = new URL(request.url);
-    const latLong = searchParams.get('latLong');
-    const category = searchParams.get('category');
-    const radius = searchParams.get('radius');
-    const language = searchParams.get('language') || 'vi';
+    const latParam = searchParams.get('lat');
+    const lngParam = searchParams.get('lng');
+    const typeParam = searchParams.get('type');
+    const radiusParam = searchParams.get('radius');
+    const languageParam = searchParams.get('language') || 'vi';
 
-    if (!latLong || !category) {
-      console.error('Missing required parameters:', { latLong, category });
+    // Validate required parameters
+    if (!latParam || !lngParam || !typeParam) {
+      console.error('Missing required parameters:', { lat: latParam, lng: lngParam, type: typeParam });
       return NextResponse.json(
-        { error: 'Missing required parameters', params: { latLong: !!latLong, category: !!category } },
+        { 
+          error: 'Missing required parameters', 
+          params: { lat: !!latParam, lng: !!lngParam, type: !!typeParam }
+        },
         { status: 400 }
       );
     }
 
-    console.log('TripAdvisor search request:', { latLong, category, radius, language });
+    // Parse parameters
+    const latitude = parseFloat(latParam);
+    const longitude = parseFloat(lngParam);
+    const type = typeParam as PlaceType;
+    const radius = radiusParam ? parseFloat(radiusParam) / 1000 : 3; // Convert meters to km
 
-    // Parse the latLong parameter
-    const [lat, lng] = latLong.split(',').map(coord => parseFloat(coord.trim()));
-    
-    // Convert radius to number (default to 3km if not provided)
-    const radiusValue = radius ? parseFloat(radius) : 3;
-    
-    // Map the category to a PlaceType
-    const placeType = mapCategoryToPlaceType(category);
+    console.log('TripAdvisor search request:', { latitude, longitude, type, radius, language: languageParam });
 
-    // Call searchPlaces with the correct parameter structure
-    const places = await TripadvisorService.searchPlaces({
-      latitude: lat,
-      longitude: lng,
-      type: placeType,
-      radius: radiusValue
+    // Print environment variable details (don't log the full key)
+    console.log('API Key (first 4 chars):', apiKey.substring(0, 4) + '****');
+
+    // Call TripAdvisor service
+    const places = await TripAdvisorService.searchPlaces({
+      latitude,
+      longitude,
+      type,
+      radius,
+      language: languageParam
     });
 
     console.log(`Found ${places.length} places from TripAdvisor`);
     return NextResponse.json(places);
   } catch (error) {
     console.error('API Error:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to fetch places from TripAdvisor', 
-        details: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString(),
-        env: {
-          hasApiKey: !!process.env.NEXT_PUBLIC_TRIPADVISOR_API_KEY
+    
+    // Fallback to mock service
+    try {
+      console.log('Falling back to mock service...');
+      
+      // Import mock service dynamically
+      const { MockPlacesService } = await import('@/app/dashboard/Map/components/MockPlacesService');
+      
+      // Get parameters again
+      const { searchParams } = new URL(request.url);
+      const latParam = searchParams.get('lat');
+      const lngParam = searchParams.get('lng');
+      const typeParam = searchParams.get('type') as PlaceType;
+      const radiusParam = searchParams.get('radius');
+      
+      if (!latParam || !lngParam || !typeParam) {
+        throw new Error("Missing required parameters");
+      }
+      
+      const latitude = parseFloat(latParam);
+      const longitude = parseFloat(lngParam);
+      const radius = radiusParam ? parseInt(radiusParam) : 1000;
+      
+      const mockPlaces = await MockPlacesService.searchPlaces(
+        latitude,
+        longitude,
+        typeParam,
+        radius
+      );
+      
+      console.log(`Generated ${mockPlaces.length} mock places as fallback`);
+      
+      // Return mock data with a special header to indicate it's mock data
+      return NextResponse.json(mockPlaces, {
+        headers: {
+          'X-Data-Source': 'mock',
         }
-      },
-      { status: 500 }
-    );
-  }
-}
-
-// Helper function to map TripAdvisor category to PlaceType
-function mapCategoryToPlaceType(category: string): PlaceType {
-  switch(category.toLowerCase()) {
-    case 'restaurants':
-      return 'restaurant';
-    case 'hotels':
-      return 'hotel';
-    case 'attractions':
-      return 'tourist_attraction';
-    case 'shopping':
-      return 'mall';
-    default:
-      return 'restaurant';
+      });
+    } catch (mockError) {
+      console.error('Mock service also failed:', mockError);
+      
+      // If everything fails, return the original error
+      return NextResponse.json(
+        { 
+          error: 'Failed to fetch places', 
+          details: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date().toISOString()
+        },
+        { status: 500 }
+      );
+    }
   }
 }

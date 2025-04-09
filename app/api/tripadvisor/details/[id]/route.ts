@@ -1,13 +1,14 @@
+// app/api/tripadvisor/details/[id]/route.ts
 import { NextResponse } from 'next/server';
-import { TripadvisorService } from '@/services/tripAdvisorService';
+import { TripAdvisorService } from '@/services/tripAdvisorService';
+import { PlayCircle } from 'lucide-react';
 
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    const id = params.id;
-    
+    const { id } = await params; // Sử dụng await để lấy giá trị của params    
     if (!id) {
       return NextResponse.json(
         { error: 'Missing place ID' },
@@ -17,8 +18,9 @@ export async function GET(
 
     console.log('Fetching details for TripAdvisor place:', id);
 
-    const placeDetails = await TripadvisorService.getPlaceDetails(id);
-    
+    const placeDetails = await TripAdvisorService.getPlaceDetails(id);
+    console.log(placeDetails)
+
     if (!placeDetails) {
       return NextResponse.json(
         { error: 'Place not found', id },

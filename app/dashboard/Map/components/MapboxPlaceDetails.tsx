@@ -15,7 +15,8 @@ import {
   Camera,
   ThumbsUp,
   X,
-  Navigation
+  Navigation,
+  Bookmark
 } from 'lucide-react';
 import { Place } from '../types';
 
@@ -23,16 +24,19 @@ interface PlaceDetailsProps {
   place: Place;
   onClose?: () => void;
   onGetDirections?: (place: Place) => void;
+  onSave?: (place: Place) => void;
 }
 
 const MapboxPlaceDetails: React.FC<PlaceDetailsProps> = ({ 
   place, 
   onClose,
-  onGetDirections 
+  onGetDirections,
+  onSave
 }) => {
   const [activeTab, setActiveTab] = React.useState<'info' | 'photos'>('info');
   const [extendedDetails, setExtendedDetails] = useState<Place | null>(null);
   const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     // If we have an ID, fetch detailed information
@@ -106,6 +110,13 @@ const MapboxPlaceDetails: React.FC<PlaceDetailsProps> = ({
         <span className="text-sm text-gray-600">({rating})</span>
       </div>
     );
+  };
+
+  const handleSave = () => {
+    setSaved(true);
+    if (onSave) {
+      onSave(displayPlace);
+    }
   };
 
   const renderContent = () => {
@@ -217,6 +228,15 @@ const MapboxPlaceDetails: React.FC<PlaceDetailsProps> = ({
             >
               <Navigation className="w-5 h-5" />
               <span>Get Directions</span>
+            </button>
+            
+            <button
+              onClick={handleSave}
+              disabled={saved}
+              className={`w-full py-2 ${saved ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'} text-white text-center rounded-md transition flex items-center justify-center gap-2`}
+            >
+              <Bookmark className="w-5 h-5" />
+              <span>{saved ? 'Saved' : 'Save to My Places'}</span>
             </button>
             
             {displayPlace.details?.website && (

@@ -6,10 +6,16 @@ import { NavigationControl, GeolocateControl, Source, Layer, ViewStateChangeEven
 import MapGLWrapper from './MapGLWrapper';
 import type { Map as MapboxMap } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Search, Navigation, MapPin, X, Layers, Menu } from 'lucide-react';
+import { Search, Navigation, MapPin, X, Layers, Menu, Camera, List, Globe } from 'lucide-react';
 import AdvancedSearchControl from './AdvancedSearchControl';
 import IsochronePanel from './IsochronePanel';
 import TrafficToggle from './TrafficToggle';
+import NearbyPlacesControl from './NearbyPlacesControl';
+import MapboxPlaceDetails from './MapboxPlaceDetails';
+import StaticMapExport from './StaticMapExport';
+import MapboxDirections from './MapboxDirections';
+import RouteOptimizer from './RouteOptimizer';
+import { Place, PlaceType } from '../types'; 
 
 // Định nghĩa kiểu cho điểm đã chọn
 interface SelectedPlace {
@@ -41,6 +47,17 @@ const EnhancedMapboxMap: React.FC<EnhancedMapboxMapProps> = ({ initialLocation }
   const [routeData, setRouteData] = useState<GeoJSON.Feature | null>(null);
   const [isMobileControlsVisible, setIsMobileControlsVisible] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
+  
+  // State for new features
+  const [placeType, setPlaceType] = useState<PlaceType>('restaurant');
+  const [searchRadius, setSearchRadius] = useState<string>('1000');
+  const [isSearchingNearby, setIsSearchingNearby] = useState(false);
+  const [nearbyPlaces, setNearbyPlaces] = useState<Place[]>([]);
+  const [showPlaceDetails, setShowPlaceDetails] = useState(false);
+  const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<Place | null>(null);
+  const [savedPlaces, setSavedPlaces] = useState<Place[]>([]);
+  const [showRouteOptimizer, setShowRouteOptimizer] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   
   // Lấy Mapbox token từ biến môi trường
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
@@ -205,6 +222,138 @@ const EnhancedMapboxMap: React.FC<EnhancedMapboxMapProps> = ({ initialLocation }
     setIsMobileControlsVisible(!isMobileControlsVisible);
   }, [isMobileControlsVisible]);
 
+  // Handle nearby places search
+  const handleNearbyPlacesSearch = useCallback(async () => {
+    if (!currentLocation) {
+      console.error('Current location not available');
+      setSearchError('Vị trí hiện tại không khả dụng');
+      return;
+    }
+    
+    setIsSearchingNearby(true);
+    setSearchError(null);
+    setNearbyPlaces([]);
+    
+    try {
+      // Sử dụng API TripAdvisor đã sửa chữa
+      const params = new URLSearchParams({
+        lat: String(currentLocation[1]), // Latitude
+        lng: String(currentLocation[0]), // Longitude
+        type: placeType,
+        radius: searchRadius,
+        language: 'vi'
+      });
+      
+      console.log(`Searching for ${placeType} within ${searchRadius}m using TripAdvisor API`);
+      
+      // Gọi API TripAdvisor
+      const response = await fetch(`/api/tripadvisor/search?${params.toString()}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Lỗi không xác định' }));
+        throw new Error(errorData.error || `API error: ${response.status}`);
+      }
+      
+      // Parse the response
+      const data = await response.json() as Place[];
+      setNearbyPlaces(data);
+      
+      console.log(`Found ${data.length} places nearby`);
+      
+      if (data.length === 0) {
+        setSearchError('Không tìm thấy địa điểm nào phù hợp. Vui lòng thử lại với tùy chọn khác.');
+      }
+      
+    } catch (error) {
+      console.error('Error searching for nearby places:', error);
+      setSearchError(error instanceof Error ? error.message : 'Lỗi không xác định khi tìm kiếm địa điểm');
+      
+      // Nếu API thực thất bại, sử dụng dịch vụ mô phỏng làm dự phòng
+      
+    }
+  }, [currentLocation, placeType, searchRadius]);
+
+  // Handle selecting a place from nearby results
+  const handleSelectNearbyPlace = useCallback(async (place: Place) => {
+    // First, set the basic details and fly to location
+    setSelectedPlaceDetails(place);
+    setShowPlaceDetails(true);
+    
+    // Fly to the selected place
+    if (mapRef.current && place.latitude && place.longitude) {
+      mapRef.current.flyTo({
+        center: [parseFloat(place.longitude), parseFloat(place.latitude)],
+        zoom: 16,
+        duration: 1000
+      });
+    }
+    
+    // Then fetch detailed information if we have a place ID
+    if (place.id) {
+      try {
+        console.log(`Fetching details for place ID: ${place.id}`);
+        
+        // Fetch from TripAdvisor API
+        const response = await fetch(`/api/tripadvisor/details/${place.id}`, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+        
+        // Parse the response
+        const detailedPlace = await response.json() as Place;
+        setSelectedPlaceDetails(detailedPlace);
+        
+      } catch (error) {
+        console.error('Error fetching place details:', error);
+        
+        // Fallback to mock service
+ 
+        // Keep the basic place data if all fetches fail
+      }
+    }
+  }, []);
+
+  // Save a place to the list
+  const handleSavePlace = useCallback((place: Place) => {
+    setSavedPlaces(prev => {
+      // Check if place already exists
+      if (prev.some(p => p.id === place.id)) {
+        return prev;
+      }
+      return [...prev, place];
+    });
+    setShowPlaceDetails(false);
+  }, []);
+
+  // Optimize route for saved places
+  const handleOptimizeRoute = useCallback((places: Place[]) => {
+    console.log('Optimizing route for places:', places);
+    // Here you would implement the routing algorithm
+    // For now, just close the optimizer
+    setShowRouteOptimizer(false);
+    
+    // Create markers for each place on the map
+    // And perhaps draw a route between them
+  }, []);
+
+  // Start navigation with the optimized route
+  const handleStartNavigation = useCallback((places: Place[]) => {
+    console.log('Starting navigation with places:', places);
+    // Implement navigation UI
+    setShowRouteOptimizer(false);
+  }, []);
+
   return (
     <div className="relative h-full w-full overflow-hidden">
       {/* Mapbox Map */}
@@ -260,6 +409,33 @@ const EnhancedMapboxMap: React.FC<EnhancedMapboxMapProps> = ({ initialLocation }
           </Marker>
         )}
         
+        {/* Nearby Places Markers */}
+        {nearbyPlaces.map((place) => (
+          <Marker 
+            key={place.id || `${place.latitude}-${place.longitude}`}
+            longitude={parseFloat(place.longitude)}
+            latitude={parseFloat(place.latitude)}
+            anchor="bottom"
+          >
+            <div className="relative group">
+              <MapPin 
+                size={24} 
+                className={`${
+                  place.type === 'restaurant' ? 'text-red-500' :
+                  place.type === 'hotel' ? 'text-blue-500' :
+                  place.type === 'cafe' ? 'text-amber-500' :
+                  place.type === 'tourist_attraction' ? 'text-green-500' :
+                  'text-purple-500'
+                } cursor-pointer hover:scale-110 transition-transform duration-200`}
+                onClick={() => handleSelectNearbyPlace(place)}
+              />
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-1 w-max bg-white text-xs py-1 px-2 rounded shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                {place.name}
+              </div>
+            </div>
+          </Marker>
+        ))}
+        
         {/* Place Information Popup */}
         {selectedPlace && showPopup && (
           <Popup
@@ -306,6 +482,15 @@ const EnhancedMapboxMap: React.FC<EnhancedMapboxMapProps> = ({ initialLocation }
               }}
             />
           </Source>
+        )}
+        
+        {/* Full Directions Component (when directions are active) */}
+        {showDirections && currentLocation && selectedPlace && (
+          <MapboxDirections
+            startPoint={currentLocation}
+            endPoint={selectedPlace.coordinates}
+            mode={travelMode}
+          />
         )}
       </MapGLWrapper>
       
@@ -375,6 +560,83 @@ const EnhancedMapboxMap: React.FC<EnhancedMapboxMapProps> = ({ initialLocation }
           <Layers size={18} />
           <span>Vị trí của tôi</span>
         </button>
+        
+        {/* Static Map Export Button */}
+        {currentLocation && (
+          <StaticMapExport
+            center={currentLocation}
+            zoom={viewState.zoom}
+            markers={[
+              ...(selectedPlace ? [{
+                longitude: selectedPlace.coordinates[0],
+                latitude: selectedPlace.coordinates[1],
+                label: selectedPlace.name
+              }] : []),
+              {
+                longitude: currentLocation[0],
+                latitude: currentLocation[1],
+                label: 'Vị trí của tôi'
+              }
+            ]}
+          />
+        )}
+        
+        {/* Saved Places / Route Optimizer Button */}
+        <button
+          className="flex items-center space-x-2 py-2 px-3 rounded-lg shadow bg-white text-gray-700 hover:bg-gray-50"
+          onClick={() => setShowRouteOptimizer(true)}
+        >
+          <List size={18} />
+          <span>Lộ trình</span>
+          {savedPlaces.length > 0 && (
+            <span className="bg-blue-500 text-white w-5 h-5 rounded-full text-xs flex items-center justify-center">
+              {savedPlaces.length}
+            </span>
+          )}
+        </button>
+      </div>
+      
+      {/* Right Side Panel - Nearby Places */}
+      <div className="absolute top-4 right-4 z-10">
+        <NearbyPlacesControl
+          selectedLocation={currentLocation}
+          placeType={placeType}
+          searchRadius={searchRadius}
+          onPlaceTypeChange={setPlaceType}
+          onRadiusChange={setSearchRadius}
+          isSearching={isSearchingNearby}
+          onSearch={handleNearbyPlacesSearch}
+        />
+        
+        {/* Error message */}
+        {searchError && (
+          <div className="mt-2 bg-red-50 border border-red-200 p-3 rounded-lg shadow-lg text-sm text-red-600">
+            <div className="flex justify-between items-center">
+              <span>{searchError}</span>
+              <button 
+                onClick={() => setSearchError(null)} 
+                className="text-red-500 hover:text-red-700"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {/* Results indicator */}
+        {nearbyPlaces.length > 0 && !isSearchingNearby && !searchError && (
+          <div className="mt-2 bg-white p-3 rounded-lg shadow-lg text-sm">
+            <div className="flex justify-between items-center">
+              <span className="font-medium">Tìm thấy {nearbyPlaces.length} địa điểm</span>
+              <button 
+                onClick={() => setNearbyPlaces([])} 
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       
       {/* Bottom Controls */}
@@ -383,9 +645,9 @@ const EnhancedMapboxMap: React.FC<EnhancedMapboxMapProps> = ({ initialLocation }
           travelTime={selectedTravelTime}
           onTravelTimeChange={setSelectedTravelTime}
           onGenerateIsochrone={() => {
-            if (mapRef.current && mapLoaded) {
-              const center = mapRef.current.getCenter();
+            if (mapRef.current && mapLoaded && currentLocation) {
               // Logic to generate isochrone here...
+              console.log('Generating isochrone for', currentLocation, 'with travel time', selectedTravelTime);
             }
           }}
         />
@@ -424,6 +686,52 @@ const EnhancedMapboxMap: React.FC<EnhancedMapboxMapProps> = ({ initialLocation }
               {travelMode === 'walking' ? '🚶 Đi bộ' : 
                travelMode === 'cycling' ? '🚲 Xe đạp' : '🚗 Lái xe'}
             </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Place Details Sidebar - When a nearby place is selected */}
+      {showPlaceDetails && selectedPlaceDetails && (
+        <div className="absolute top-0 right-0 bottom-0 w-80 z-30 bg-white shadow-lg">
+          <MapboxPlaceDetails 
+            place={selectedPlaceDetails}
+            onClose={() => setShowPlaceDetails(false)}
+            onGetDirections={(place) => {
+              if (place.latitude && place.longitude && currentLocation) {
+                setSelectedPlace({
+                  name: place.name,
+                  coordinates: [parseFloat(place.longitude), parseFloat(place.latitude)],
+                  address: place.details?.address
+                });
+                setShowPlaceDetails(false);
+                setShowPopup(true);
+                handleGetDirections();
+              }
+            }}
+            onSave={() => handleSavePlace(selectedPlaceDetails)}
+          />
+        </div>
+      )}
+      
+      {/* Route Optimizer Modal */}
+      {showRouteOptimizer && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
+          <div className="bg-white rounded-lg p-4 max-w-md w-full max-h-[80vh] overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Lộ trình của bạn</h3>
+              <button 
+                onClick={() => setShowRouteOptimizer(false)}
+                className="text-gray-500 hover:text-gray-700 p-1"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <RouteOptimizer 
+              savedPlaces={savedPlaces}
+              onOptimizeRoute={handleOptimizeRoute}
+              onStartNavigation={handleStartNavigation}
+            />
           </div>
         </div>
       )}
