@@ -23,8 +23,46 @@ export interface Place {
     date?: string;
   };
   details?: PlaceDetails;
+  
+  // Additional TripAdvisor specific fields
+  hours?: {
+    periods: Array<{
+      open: { day: number; time: string };
+      close: { day: number; time: string };
+    }>;
+    weekday_text: string[];
+  };
+  features?: string[];
+  cuisine?: Array<{
+    name: string;
+    localized_name?: string;
+  }>;
+  ranking_data?: {
+    geo_location_id?: string;
+    ranking_string?: string;
+    geo_location_name?: string;
+    ranking_out_of?: string;
+    ranking?: string;
+  };
+  write_review?: string;
+  web_url?: string;
+  num_reviews?: string;
+  address_obj?: {
+    street1?: string;
+    street2?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    postalcode?: string;
+    address_string?: string;
+  };
+  see_all_photos?: string;
+  price_level?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  timezone?: string;
 }
-
 export interface PlaceDetails {
   // Basic information
   description?: string;

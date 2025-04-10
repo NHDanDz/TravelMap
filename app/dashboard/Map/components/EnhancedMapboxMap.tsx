@@ -223,60 +223,62 @@ const EnhancedMapboxMap: React.FC<EnhancedMapboxMapProps> = ({ initialLocation }
   }, [isMobileControlsVisible]);
 
   // Handle nearby places search
-  const handleNearbyPlacesSearch = useCallback(async () => {
-    if (!currentLocation) {
-      console.error('Current location not available');
-      setSearchError('Vị trí hiện tại không khả dụng');
-      return;
+// Handle nearby places search
+const handleNearbyPlacesSearch = useCallback(async () => {
+  if (!currentLocation) {
+    console.error('Current location not available');
+    setSearchError('Vị trí hiện tại không khả dụng');
+    return;
+  }
+  
+  setIsSearchingNearby(true);
+  setSearchError(null);
+  setNearbyPlaces([]);
+  
+  try {
+    // Sử dụng API TripAdvisor đã sửa chữa
+    const params = new URLSearchParams({
+      lat: String(currentLocation[1]), // Latitude
+      lng: String(currentLocation[0]), // Longitude
+      type: placeType,
+      radius: searchRadius,
+      language: 'vi',
+      exact: 'true' // Request exact coordinates for better accuracy
+    });
+    
+    console.log(`Searching for ${placeType} within ${searchRadius}m using TripAdvisor API`);
+    
+    // Gọi API TripAdvisor
+    const response = await fetch(`/api/tripadvisor/search?${params.toString()}`, {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Lỗi không xác định' }));
+      throw new Error(errorData.error || `API error: ${response.status}`);
     }
     
-    setIsSearchingNearby(true);
-    setSearchError(null);
-    setNearbyPlaces([]);
+    // Parse the response
+    const data = await response.json() as Place[];
+    setNearbyPlaces(data);
     
-    try {
-      // Sử dụng API TripAdvisor đã sửa chữa
-      const params = new URLSearchParams({
-        lat: String(currentLocation[1]), // Latitude
-        lng: String(currentLocation[0]), // Longitude
-        type: placeType,
-        radius: searchRadius,
-        language: 'vi'
-      });
-      
-      console.log(`Searching for ${placeType} within ${searchRadius}m using TripAdvisor API`);
-      
-      // Gọi API TripAdvisor
-      const response = await fetch(`/api/tripadvisor/search?${params.toString()}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Lỗi không xác định' }));
-        throw new Error(errorData.error || `API error: ${response.status}`);
-      }
-      
-      // Parse the response
-      const data = await response.json() as Place[];
-      setNearbyPlaces(data);
-      
-      console.log(`Found ${data.length} places nearby`);
-      
-      if (data.length === 0) {
-        setSearchError('Không tìm thấy địa điểm nào phù hợp. Vui lòng thử lại với tùy chọn khác.');
-      }
-      
-    } catch (error) {
-      console.error('Error searching for nearby places:', error);
-      setSearchError(error instanceof Error ? error.message : 'Lỗi không xác định khi tìm kiếm địa điểm');
-      
-      // Nếu API thực thất bại, sử dụng dịch vụ mô phỏng làm dự phòng
-      
+    console.log(`Found ${data.length} places nearby`);
+    
+    if (data.length === 0) {
+      setSearchError('Không tìm thấy địa điểm nào phù hợp. Vui lòng thử lại với tùy chọn khác.');
     }
-  }, [currentLocation, placeType, searchRadius]);
+    
+  } catch (error) {
+    console.error('Error searching for nearby places:', error);
+    setSearchError(error instanceof Error ? error.message : 'Lỗi không xác định khi tìm kiếm địa điểm');
+    
+    // Nếu API thực thất bại, sử dụng dịch vụ mô phỏng làm dự phòng
+    
+  }
+}, [currentLocation, placeType, searchRadius]);
 
   // Handle selecting a place from nearby results
   const handleSelectNearbyPlace = useCallback(async (place: Place) => {
