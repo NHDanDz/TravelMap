@@ -113,6 +113,7 @@ const MapboxDirections: React.FC<DirectionsProps> = ({
     // Calculate rough distance (straight line)
     const dx = startPoint[0] - endPoint[0];
     const dy = startPoint[1] - endPoint[1];
+    
     // Rough approximation (not accounting for Earth's curvature)
     // 111,111 meters is roughly 1 degree of latitude
     // Longitude degrees vary by latitude, but we'll use a simple approximation
@@ -150,14 +151,13 @@ const MapboxDirections: React.FC<DirectionsProps> = ({
     setFallbackAttempted(prev => [...prev, transportMode]);
     
     try {
-      // Log the request details
-      console.log(`Requesting ${transportMode} directions from [${startPoint[0]},${startPoint[1]}] to [${endPoint[0]},${endPoint[1]}]`);
-      
-      // Validate coordinates (NaN check)
-      if (isNaN(startPoint[0]) || isNaN(startPoint[1]) || 
-          isNaN(endPoint[0]) || isNaN(endPoint[1])) {
+      // Validate that coordinates are finite numbers
+      if (!isFinite(startPoint[0]) || !isFinite(startPoint[1]) || 
+          !isFinite(endPoint[0]) || !isFinite(endPoint[1])) {
         throw new Error('Tọa độ không hợp lệ');
       }
+      
+      console.log(`Requesting ${transportMode} directions from [${startPoint[0]},${startPoint[1]}] to [${endPoint[0]},${endPoint[1]}]`);
       
       // Get Mapbox access token
       const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
@@ -165,32 +165,44 @@ const MapboxDirections: React.FC<DirectionsProps> = ({
         throw new Error('Không tìm thấy token Mapbox');
       }
 
+      // Ensure coordinates are in the correct format: longitude,latitude
+      const coordinatesString = `${startPoint[0]},${startPoint[1]};${endPoint[0]},${endPoint[1]}`;
+
       // Build optimized URL for the specific transport mode
-      let url = `https://api.mapbox.com/directions/v5/mapbox/${transportMode}/` +
-                `${startPoint[0]},${startPoint[1]};` +
-                `${endPoint[0]},${endPoint[1]}` +
-                `?steps=true&geometries=geojson&alternatives=true&overview=full` +
-                `&language=vi`;
+      // Note: Mapbox expects coordinates as longitude,latitude
+      let url = `https://api.mapbox.com/directions/v5/mapbox/${transportMode}/${coordinatesString}`;
       
-      // Add mode-specific parameters
-      if (transportMode === 'cycling') {
-        url += '&exclude=motorway,ferry,toll';
-      } else if (transportMode === 'walking') {
-        url += '&exclude=motorway';
+      // Add query parameters
+      const params = new URLSearchParams({
+        'steps': 'true',
+        'geometries': 'geojson',
+        'overview': 'full',
+        'language': 'vi',
+        'access_token': token
+      });
+      
+      // Add mode-specific parameters - using only valid exclude values
+      // Valid exclude values: ferry, cash_only_tolls, border_crossing, country_border, state_border
+      if (transportMode === 'cycling' || transportMode === 'walking') {
+        // We can exclude ferry for both cycling and walking if desired
+        params.append('exclude', 'ferry');
       }
-      
-      // Add access token
-      url += `&access_token=${token}`;
       
       // Use fetch with timeout to avoid hanging requests
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
-      const response = await fetch(url, { signal: controller.signal });
+      const response = await fetch(`${url}?${params.toString()}`, { 
+        signal: controller.signal,
+        method: 'GET'
+      });
+      
       clearTimeout(timeoutId);
       
       if (!response.ok) {
-        throw new Error(`API lỗi: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error(`API error (${response.status}):`, errorText);
+        throw new Error(`API lỗi: ${response.status}`);
       }
       
       const data = await response.json();

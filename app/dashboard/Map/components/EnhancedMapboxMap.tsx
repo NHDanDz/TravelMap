@@ -302,7 +302,49 @@ const EnhancedMapboxMap: React.FC<EnhancedMapboxMapProps> = ({ initialLocation }
     setShowPopup(false);
     setSelectedPlace(null);
   }, []);
-
+  function createDirectLine(
+    current: [number, number] | null,
+    selected: SelectedPlace | null,
+    mapRef: React.RefObject<MapboxMap>,
+    mapLoaded: boolean
+  ): GeoJSON.Feature | null {
+    if (!current || !selected) return null;
+    
+    // Create a simple straight line route as fallback
+    const directRoute: GeoJSON.Feature = {
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [current[0], current[1]],
+          [selected.coordinates[0], selected.coordinates[1]]
+        ]
+      }
+    };
+    
+    // Fit the map to show both points
+    if (mapRef.current && mapLoaded) {
+      const bounds = [
+        [
+          Math.min(current[0], selected.coordinates[0]),
+          Math.min(current[1], selected.coordinates[1])
+        ],
+        [
+          Math.max(current[0], selected.coordinates[0]),
+          Math.max(current[1], selected.coordinates[1])
+        ]
+      ];
+      
+      mapRef.current.fitBounds(bounds as [[number, number], [number, number]], {
+        padding: 100,
+        duration: 1000
+      });
+    }
+    
+    return directRoute;
+  }
+  
   // Toggle mobile controls visibility
   const toggleMobileControls = useCallback(() => {
     setIsMobileControlsVisible(!isMobileControlsVisible);

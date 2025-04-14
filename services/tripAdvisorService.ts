@@ -130,7 +130,39 @@ static async searchPlaces(options: TripAdvisorSearchOptions): Promise<Place[]> {
       return [];
     }
   }
-
+  private static convertDetailResponseToPlace(data: any): Place {
+    // Xác định loại địa điểm
+    const type = this.determinePlaceType(data);
+  
+    // Địa chỉ
+    const address = data.address_obj?.address_string || '';
+  
+    // Tạo đối tượng Place
+    const place: Place = {
+      id: data.location_id,
+      name: data.name,
+      latitude: data.latitude?.toString() || '',
+      longitude: data.longitude?.toString() || '',
+      rating: data.rating?.toString() || '0',
+      type: type,
+  
+      // Thông tin bổ sung
+      address_obj: data.address_obj,
+      web_url: data.web_url,
+      write_review: data.write_review,
+      photo: data.photo,
+  
+      details: {
+        address: address,
+        description: data.description || '',
+        // Thêm các thông tin chi tiết khác nếu cần
+        phone: data.phone,
+        website: data.website
+      }
+    };
+  
+    return place;
+  }
   /**
    * Lấy chi tiết địa điểm từ TripAdvisor API
    */
