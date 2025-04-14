@@ -247,7 +247,7 @@ const featuredPlaces = [
     id: 2,
     name: 'Phố cổ Hội An',
     location: 'Quảng Nam',
-    image: '/images/place-hoian.jpg',
+    image: '/images/place-hoian.webp',
     rating: 4.9,
     type: 'tourist_attraction'
   },
@@ -263,7 +263,7 @@ const featuredPlaces = [
     id: 4,
     name: 'Phở Bát Đàn',
     location: 'Hà Nội',
-    image: '/images/place-pho.jpg',
+    image: '/images/place-pho.png',
     rating: 4.6,
     type: 'restaurant'
   }
@@ -274,37 +274,37 @@ const popularCities = [
   {
     id: 1,
     name: 'Hà Nội',
-    image: '/images/city-hanoi.jpg',
+    image: '/images/ha-noi.jpg',
     count: 240
   },
   {
     id: 2,
     name: 'TP. Hồ Chí Minh',
-    image: '/images/city-hcm.jpg',
+    image: '/images/sai-gon.jpg',
     count: 320
   },
   {
     id: 3,
     name: 'Đà Nẵng',
-    image: '/images/city-danang.jpg',
+    image: '/images/da-nang.jpg',
     count: 180
   },
   {
     id: 4,
     name: 'Huế',
-    image: '/images/city-hue.jpg',
+    image: '/images/hue.jpg',
     count: 150
   },
   {
     id: 5,
     name: 'Nha Trang',
-    image: '/images/city-nhatrang.jpg',
+    image: '/images/nha-trang.jpg',
     count: 200
   },
   {
     id: 6,
     name: 'Đà Lạt',
-    image: '/images/city-dalat.jpg',
+    image: '/images/da-lat.jpg',
     count: 210
   }
 ];
@@ -314,23 +314,23 @@ const testimonials = [
   {
     id: 1,
     content: 'TravelSense giúp tôi khám phá nhiều địa điểm thú vị mà trước đây tôi không biết, ngay cả ở thành phố tôi đã sống nhiều năm.',
-    author: 'Nguyễn Văn A',
+    author: 'Trần Trung Hiếu',
     location: 'Hà Nội',
-    avatar: '/images/avatar-1.jpg'
+    avatar: '/images/human-1.jpg'
   },
   {
     id: 2,
     content: 'Tính năng lập lịch trình của TravelSense rất hữu ích cho chuyến du lịch của gia đình tôi. Mọi thứ đều được sắp xếp hợp lý và tiết kiệm thời gian.',
-    author: 'Trần Thị B',
+    author: 'Nguyễn Đặng Khôi Nguyên',
     location: 'TP. Hồ Chí Minh',
-    avatar: '/images/avatar-2.jpg'
+    avatar: '/images/human-2.jpg'
   },
   {
     id: 3,
     content: 'Đánh giá và gợi ý trên TravelSense rất chính xác. Tôi đã tìm được những nhà hàng ngon và khách sạn tốt nhờ nền tảng này.',
-    author: 'Lê Văn C',
+    author: 'Đàm Vũ Đức Anh',
     location: 'Đà Nẵng',
-    avatar: '/images/avatar-3.jpg'
+    avatar: '/images/human-3.jpg'
   }
 ];
 

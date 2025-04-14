@@ -1,6 +1,6 @@
 // app/contact/page.tsx
 'use client';
-
+import Image from 'next/image';
 import React, { useState } from 'react';
 import SharedLayout from '@/app/components/layout/SharedLayout';
 import { 
@@ -8,6 +8,19 @@ import {
 } from 'lucide-react';
 
 const ContactPage = () => {
+    // Tọa độ văn phòng
+    const longitude = 105.785851;
+    const latitude = 21.048411;
+    
+    // Cấu hình Mapbox Static Map
+    const zoom = 15;
+    const width = 1200;
+    const height = 600;
+    const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+    
+    // Tạo URL của Mapbox Static Map với marker tại vị trí văn phòng
+    const mapUrl = `https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/pin-l+f44336(${longitude},${latitude})/${longitude},${latitude},${zoom},0/${width}x${height}?access_token=${mapboxToken}`;
+    
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -86,8 +99,8 @@ const ContactPage = () => {
                     <div className="ml-4">
                       <h3 className="text-lg font-medium text-gray-800">Địa chỉ</h3>
                       <p className="text-gray-600 mt-1">
-                        Tòa nhà Innovation, 123 Đường Nguyễn Huệ<br />
-                        Quận 1, TP. Hồ Chí Minh
+                        Số 236 Hoàng Quốc Việt, Cổ Nhuế<br />
+                        Bắc Từ Liêm, Hà Nội
                       </p>
                     </div>
                   </div>
@@ -99,10 +112,10 @@ const ContactPage = () => {
                     <div className="ml-4">
                       <h3 className="text-lg font-medium text-gray-800">Điện thoại</h3>
                       <p className="text-gray-600 mt-1">
-                        <a href="tel:+84901234567" className="hover:text-blue-600">+84 90 123 4567</a>
+                        <a href="tel:+84901234567" className="hover:text-blue-600">+84 9717 93374</a>
                       </p>
                       <p className="text-gray-600">
-                        <a href="tel:+842838123456" className="hover:text-blue-600">+84 28 3812 3456</a>
+                        <a href="tel:+842838123456" className="hover:text-blue-600">+84 9733 96044</a>
                       </p>
                     </div>
                   </div>
@@ -114,10 +127,10 @@ const ContactPage = () => {
                     <div className="ml-4">
                       <h3 className="text-lg font-medium text-gray-800">Email</h3>
                       <p className="text-gray-600 mt-1">
-                        <a href="mailto:info@travelsense.com" className="hover:text-blue-600">info@travelsense.com</a>
+                        <a href="mailto:info@travelsense.com" className="hover:text-blue-600">nhdandz@gmail.com</a>
                       </p>
                       <p className="text-gray-600">
-                        <a href="mailto:support@travelsense.com" className="hover:text-blue-600">support@travelsense.com</a>
+                        <a href="mailto:support@travelsense.com" className="hover:text-blue-600">satianryokubn@gmail.com</a>
                       </p>
                     </div>
                   </div>
@@ -288,21 +301,29 @@ const ContactPage = () => {
         
         {/* Map */}
         <section className="py-8">
-          <div className="max-w-6xl mx-auto px-6">
-            <div className="bg-gray-200 rounded-xl overflow-hidden h-96">
-              {/* Replace with actual map implementation */}
-              <div className="w-full h-full bg-gray-300 flex items-center justify-center">
-                <div className="text-center">
-                  <MapPin className="w-12 h-12 text-gray-500 mx-auto mb-2" />
-                  <p className="text-gray-600 font-medium">Bản đồ địa điểm văn phòng</p>
-                  <p className="text-gray-500 text-sm mt-2">
-                    (Số 236 Hoàng Quốc Việt, Cổ Nhuế 1, Bắc Từ Liêm, Hà Nội)
-                  </p>
-                </div>
-              </div>
+      <div className="max-w-6xl mx-auto px-6">
+        <div className="bg-white rounded-xl overflow-hidden h-96 shadow-lg">
+          <div className="w-full h-full relative">
+            {/* Ảnh bản đồ tĩnh */}
+            <Image
+              src={mapUrl}
+              alt="Vị trí văn phòng công ty"
+              fill
+              style={{ objectFit: 'cover' }}
+              className="rounded-xl"
+            />
+            
+            {/* Overlay thông tin */}
+            <div className="absolute bottom-4 left-4 bg-white p-3 rounded-lg shadow-md">
+              <h3 className="font-medium text-gray-800">Văn phòng công ty</h3>
+              <p className="text-gray-600 text-sm mt-1">
+                Số 236 Hoàng Quốc Việt, Cổ Nhuế 1, Bắc Từ Liêm, Hà Nội
+              </p>
             </div>
           </div>
-        </section>
+        </div>
+      </div>
+    </section>
         
         {/* FAQ Section */}
         <section className="py-16 bg-gray-50">

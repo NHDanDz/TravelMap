@@ -1,48 +1,53 @@
-// next.config.ts
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   images: {
-    domains: [
-      'fastly.4sqi.net',  // Foursquare image host
-      'fastly.fsqcdn.com', // Alternate Foursquare image host
-      'api.mapbox.com',    // Mapbox API
-      'mapbox.com',        // Mapbox assets
-      'tiles.mapbox.com',  // Mapbox tiles
-    ],
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**',
+        hostname: 'fastly.4sqi.net',
+      },
+      {
+        protocol: 'https',
+        hostname: 'fastly.fsqcdn.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.mapbox.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**',  // Cho phép tất cả domain khác (nếu cần)
       },
     ],
   },
-  // Configure experimental features
+  // Cấu hình Turbopack theo hướng dẫn mới
   experimental: {
-    ppr: 'incremental',
-    // Enable Turbopack for development
     turbo: {
-      // Turbopack specific rules
+      // Sử dụng rules thay vì loaders
       rules: {
-        // Include your custom rules here if needed
+        // Ví dụ: Nếu bạn có custom loader cho .mdx
+        // "*.mdx": ["mdx-loader"]
       },
-      // Resolve aliases if needed
       resolveAlias: {
-        // Example: Map a module to another module
-        // 'module-name': 'actual-module-name'
+        // Ánh xạ module nếu cần
+        // 'module-name': 'actual-module-path'
       },
-    }
+    },
+    ppr: 'incremental',
   },
-  // Add webpack configuration for Mapbox GL
-  webpack: (config) => {
+  // Cấu hình webpack để xử lý các module đặc biệt
+  webpack: (config, { isServer }) => {
     // Resolve the "Can't resolve 'fs'" issue with mapbox-gl
-    config.resolve.fallback = { 
-      ...config.resolve.fallback,
-      fs: false,
-      http: false,
-      https: false,
-      zlib: false
-    };
+    if (!isServer) {
+      config.resolve.fallback = { 
+        ...config.resolve.fallback,
+        fs: false,
+        http: false,
+        https: false,
+        zlib: false
+      };
+    }
     
     return config;
   }

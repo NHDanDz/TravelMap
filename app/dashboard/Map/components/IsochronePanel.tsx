@@ -2,15 +2,21 @@
 'use client';
 
 import React from 'react';
-import { Clock, Navigation } from 'lucide-react';
+import { Clock, Navigation, Loader2 } from 'lucide-react';
 
 interface IsochronePanelProps {
   travelTime: number;
   onTravelTimeChange: (time: number) => void;
   onGenerateIsochrone: () => void;
+  isLoading?: boolean;
 }
 
-const IsochronePanel = ({ travelTime, onTravelTimeChange, onGenerateIsochrone }: IsochronePanelProps) => {
+const IsochronePanel = ({ 
+  travelTime, 
+  onTravelTimeChange, 
+  onGenerateIsochrone,
+  isLoading = false
+}: IsochronePanelProps) => {
   return (
     <div className="bg-white p-3 rounded-lg shadow-lg">
       <div className="flex items-center mb-2">
@@ -37,10 +43,20 @@ const IsochronePanel = ({ travelTime, onTravelTimeChange, onGenerateIsochrone }:
       
       <button
         onClick={onGenerateIsochrone}
-        className="w-full bg-blue-600 text-white py-2 rounded flex items-center justify-center"
+        disabled={isLoading}
+        className="w-full bg-blue-600 text-white py-2 rounded flex items-center justify-center disabled:bg-blue-400"
       >
-        <Navigation className="w-4 h-4 mr-1" />
-        <span>Hiển thị phạm vi</span>
+        {isLoading ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <span>Đang tính toán...</span>
+          </>
+        ) : (
+          <>
+            <Navigation className="w-4 h-4 mr-1" />
+            <span>Hiển thị phạm vi</span>
+          </>
+        )}
       </button>
       
       <p className="text-xs text-gray-500 mt-2 text-center">

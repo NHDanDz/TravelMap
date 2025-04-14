@@ -6,7 +6,7 @@ import { NavigationControl, GeolocateControl, Source, Layer, ViewStateChangeEven
 import MapGLWrapper from './MapGLWrapper';
 import type { Map as MapboxMap } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Search, Navigation, MapPin, X, Layers, Menu, Camera, List, Globe } from 'lucide-react';
+import { Search, Navigation, MapPin, X, Layers, Menu, Camera, List, Globe, Loader2 } from 'lucide-react';
 import AdvancedSearchControl from './AdvancedSearchControl';
 import IsochronePanel from './IsochronePanel';
 import TrafficToggle from './TrafficToggle';
@@ -15,7 +15,8 @@ import MapboxPlaceDetails from './MapboxPlaceDetails';
 import StaticMapExport from './StaticMapExport';
 import MapboxDirections from './MapboxDirections';
 import RouteOptimizer from './RouteOptimizer';
-import { Place, PlaceType } from '../types'; 
+import { Place, PlaceType } from '../types';
+import { EnhancedMapboxService } from '@/services/enhancedMapboxService'; 
 
 // Định nghĩa kiểu cho điểm đã chọn
 interface SelectedPlace {
@@ -59,6 +60,13 @@ const EnhancedMapboxMap: React.FC<EnhancedMapboxMapProps> = ({ initialLocation }
   const [showRouteOptimizer, setShowRouteOptimizer] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   
+  // State for isochrone
+  const [isochroneData, setIsochroneData] = useState<GeoJSON.FeatureCollection | null>(null);
+  const [isochroneLoading, setIsochroneLoading] = useState(false);
+  const [isochroneVisible, setIsochroneVisible] = useState(false);
+  // Định nghĩa kiểu dữ liệu cho các tọa độ và bounds thủ công
+  type Coordinate = [number, number]; // [longitude, latitude]
+  type BoundingBox = [Coordinate, Coordinate]; // [[minLng, minLat], [maxLng, maxLat]]
   // Lấy Mapbox token từ biến môi trường
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
   
@@ -222,63 +230,152 @@ const EnhancedMapboxMap: React.FC<EnhancedMapboxMapProps> = ({ initialLocation }
     setIsMobileControlsVisible(!isMobileControlsVisible);
   }, [isMobileControlsVisible]);
 
+  // Hàm xử lý tạo isochrone (phạm vi di chuyển)
+  const handleGenerateIsochrone = useCallback(async () => {
+    if (mapRef.current && mapLoaded && currentLocation) {
+      console.log('Generating isochrone for', currentLocation, 'with travel time', selectedTravelTime);
+      
+      setIsochroneLoading(true);
+      
+      try {
+        // Gọi service để lấy dữ liệu isochrone
+        const data = await EnhancedMapboxService.getIsochrone(
+          currentLocation,
+          selectedTravelTime,
+          travelMode
+        );
+        
+        console.log('Isochrone data received:', data);
+        
+        // Cập nhật state với dữ liệu nhận được
+        setIsochroneData(data);
+        setIsochroneVisible(true);
+        
+        // Nếu có dữ liệu, điều chỉnh bản đồ để hiển thị toàn bộ phạm vi
+        if (data && data.features && data.features.length > 0 && mapRef.current) {
+          const feature = data.features[0];
+          
+          // Kiểm tra kiểu geometry
+          if (feature.geometry) {
+            let bounds: BoundingBox | null = null;
+            
+            if (feature.geometry.type === 'Polygon') {
+              // Xử lý Polygon
+              const polygonGeometry = feature.geometry as GeoJSON.Polygon;
+              // Lấy outer ring của polygon (mảng đầu tiên trong coordinates)
+              const ring = polygonGeometry.coordinates[0] as Coordinate[];
+              bounds = calculateBoundsFromCoordinates(ring);
+              
+            } else if (feature.geometry.type === 'MultiPolygon') {
+              // Xử lý MultiPolygon
+              const multiPolygonGeometry = feature.geometry as GeoJSON.MultiPolygon;
+              // Lấy outer ring của polygon đầu tiên
+              const ring = multiPolygonGeometry.coordinates[0][0] as Coordinate[];
+              bounds = calculateBoundsFromCoordinates(ring);
+            }
+            
+            // Nếu có bounds, điều chỉnh bản đồ
+            if (bounds) {
+              console.log('Calculated bounds for isochrone:', bounds);
+              
+              // Fit map để hiển thị toàn bộ isochrone
+              mapRef.current.fitBounds(bounds, {
+                padding: 50,
+                duration: 1000
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error generating isochrone:', error);
+      } finally {
+        setIsochroneLoading(false);
+      }
+    }
+  }, [currentLocation, selectedTravelTime, travelMode, mapLoaded]);
+// Hàm trợ giúp để tính toán bounds từ mảng tọa độ
+function calculateBoundsFromCoordinates(coordinates: Coordinate[]): BoundingBox {
+  // Khởi tạo giá trị min/max với giá trị đầu tiên
+  if (coordinates.length === 0) {
+    // Nếu không có tọa độ nào, trả về bounds mặc định
+    return [[0, 0], [0, 0]];
+  }
+  
+  const firstCoord = coordinates[0];
+  let minLng = firstCoord[0];
+  let minLat = firstCoord[1];
+  let maxLng = firstCoord[0];
+  let maxLat = firstCoord[1];
+  
+  // Duyệt qua tất cả tọa độ để tìm min/max
+  for (const coord of coordinates) {
+    if (coord[0] < minLng) minLng = coord[0];
+    if (coord[1] < minLat) minLat = coord[1];
+    if (coord[0] > maxLng) maxLng = coord[0];
+    if (coord[1] > maxLat) maxLat = coord[1];
+  }
+  
+  // Trả về bounds dạng [[minLng, minLat], [maxLng, maxLat]]
+  return [[minLng, minLat], [maxLng, maxLat]];
+}
   // Handle nearby places search
-// Handle nearby places search
-const handleNearbyPlacesSearch = useCallback(async () => {
-  if (!currentLocation) {
-    console.error('Current location not available');
-    setSearchError('Vị trí hiện tại không khả dụng');
-    return;
-  }
-  
-  setIsSearchingNearby(true);
-  setSearchError(null);
-  setNearbyPlaces([]);
-  
-  try {
-    // Sử dụng API TripAdvisor đã sửa chữa
-    const params = new URLSearchParams({
-      lat: String(currentLocation[1]), // Latitude
-      lng: String(currentLocation[0]), // Longitude
-      type: placeType,
-      radius: searchRadius,
-      language: 'vi',
-      exact: 'true' // Request exact coordinates for better accuracy
-    });
-    
-    console.log(`Searching for ${placeType} within ${searchRadius}m using TripAdvisor API`);
-    
-    // Gọi API TripAdvisor
-    const response = await fetch(`/api/tripadvisor/search?${params.toString()}`, {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Lỗi không xác định' }));
-      throw new Error(errorData.error || `API error: ${response.status}`);
+  const handleNearbyPlacesSearch = useCallback(async () => {
+    if (!currentLocation) {
+      console.error('Current location not available');
+      setSearchError('Vị trí hiện tại không khả dụng');
+      return;
     }
     
-    // Parse the response
-    const data = await response.json() as Place[];
-    setNearbyPlaces(data);
+    setIsSearchingNearby(true);
+    setSearchError(null);
+    setNearbyPlaces([]);
     
-    console.log(`Found ${data.length} places nearby`);
-    
-    if (data.length === 0) {
-      setSearchError('Không tìm thấy địa điểm nào phù hợp. Vui lòng thử lại với tùy chọn khác.');
+    try {
+      // Sử dụng API TripAdvisor đã sửa chữa
+      const params = new URLSearchParams({
+        lat: String(currentLocation[1]), // Latitude
+        lng: String(currentLocation[0]), // Longitude
+        type: placeType,
+        radius: searchRadius,
+        language: 'vi',
+        exact: 'true' // Request exact coordinates for better accuracy
+      });
+      
+      console.log(`Searching for ${placeType} within ${searchRadius}m using TripAdvisor API`);
+      
+      // Gọi API TripAdvisor
+      const response = await fetch(`/api/tripadvisor/search?${params.toString()}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Lỗi không xác định' }));
+        throw new Error(errorData.error || `API error: ${response.status}`);
+      }
+      
+      // Parse the response
+      const data = await response.json() as Place[];
+      setNearbyPlaces(data);
+      
+      console.log(`Found ${data.length} places nearby`);
+      
+      if (data.length === 0) {
+        setSearchError('Không tìm thấy địa điểm nào phù hợp. Vui lòng thử lại với tùy chọn khác.');
+      }
+      
+    } catch (error) {
+      console.error('Error searching for nearby places:', error);
+      setSearchError(error instanceof Error ? error.message : 'Lỗi không xác định khi tìm kiếm địa điểm');
+      
+      // Nếu API thực thất bại, sử dụng dịch vụ mô phỏng làm dự phòng
+      
+    } finally {
+      setIsSearchingNearby(false);
     }
-    
-  } catch (error) {
-    console.error('Error searching for nearby places:', error);
-    setSearchError(error instanceof Error ? error.message : 'Lỗi không xác định khi tìm kiếm địa điểm');
-    
-    // Nếu API thực thất bại, sử dụng dịch vụ mô phỏng làm dự phòng
-    
-  }
-}, [currentLocation, placeType, searchRadius]);
+  }, [currentLocation, placeType, searchRadius]);
 
   // Handle selecting a place from nearby results
   const handleSelectNearbyPlace = useCallback(async (place: Place) => {
@@ -355,7 +452,7 @@ const handleNearbyPlacesSearch = useCallback(async () => {
     // Implement navigation UI
     setShowRouteOptimizer(false);
   }, []);
-
+ 
   return (
     <div className="relative h-full w-full overflow-hidden">
       {/* Mapbox Map */}
@@ -438,6 +535,35 @@ const handleNearbyPlacesSearch = useCallback(async () => {
           </Marker>
         ))}
         
+        {/* Isochrone Layer */}
+        {isochroneData && isochroneVisible && (
+          <Source id="isochrone-data" type="geojson" data={isochroneData}>
+            <Layer
+              id="isochrone-fill"
+              type="fill"
+              paint={{
+                'fill-color': travelMode === 'driving' ? 'rgba(59, 130, 246, 0.3)' : 
+                              travelMode === 'cycling' ? 'rgba(16, 185, 129, 0.3)' : 
+                              'rgba(245, 158, 11, 0.3)',
+                'fill-outline-color': travelMode === 'driving' ? '#3b82f6' : 
+                                      travelMode === 'cycling' ? '#10b981' : 
+                                      '#f59e0b',
+                'fill-opacity': 0.6
+              }}
+            />
+            <Layer
+              id="isochrone-outline"
+              type="line"
+              paint={{
+                'line-color': travelMode === 'driving' ? '#3b82f6' : 
+                              travelMode === 'cycling' ? '#10b981' : 
+                              '#f59e0b',
+                'line-width': 2
+              }}
+            />
+          </Source>
+        )}
+        
         {/* Place Information Popup */}
         {selectedPlace && showPopup && (
           <Popup
@@ -519,19 +645,19 @@ const handleNearbyPlacesSearch = useCallback(async () => {
           <h3 className="text-sm font-medium mb-2">Phương thức di chuyển</h3>
           <div className="flex justify-between space-x-2">
             <button
-              className={`flex-1 px-3 py-2 text-sm rounded-md flex items-center justify-center ${travelMode === 'walking' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
+              className={`flex-1 px-2 py-2 text-sm rounded-md flex items-center justify-center ${travelMode === 'walking' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
               onClick={() => setTravelMode('walking')}
             >
               <span className="mr-1">🚶</span> Đi bộ
             </button>
             <button
-              className={`flex-1 px-3 py-2 text-sm rounded-md flex items-center justify-center ${travelMode === 'cycling' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
+              className={`flex-1 px-2 py-2 text-sm rounded-md flex items-center justify-center ${travelMode === 'cycling' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
               onClick={() => setTravelMode('cycling')}
             >
               <span className="mr-1">🚲</span> Xe đạp
             </button>
             <button
-              className={`flex-1 px-3 py-2 text-sm rounded-md flex items-center justify-center ${travelMode === 'driving' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
+              className={`flex-1 px-2 py-2 text-sm rounded-md flex items-center justify-center ${travelMode === 'driving' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
               onClick={() => setTravelMode('driving')}
             >
               <span className="mr-1">🚗</span> Xe hơi
@@ -646,12 +772,8 @@ const handleNearbyPlacesSearch = useCallback(async () => {
         <IsochronePanel 
           travelTime={selectedTravelTime}
           onTravelTimeChange={setSelectedTravelTime}
-          onGenerateIsochrone={() => {
-            if (mapRef.current && mapLoaded && currentLocation) {
-              // Logic to generate isochrone here...
-              console.log('Generating isochrone for', currentLocation, 'with travel time', selectedTravelTime);
-            }
-          }}
+          onGenerateIsochrone={handleGenerateIsochrone}
+          isLoading={isochroneLoading}
         />
       </div>
       
