@@ -146,34 +146,73 @@ const EnhancedMapboxMap: React.FC<EnhancedMapboxMapProps> = ({ initialLocation }
     setViewState(evt.viewState);
   }, []);
 
-  // Xử lý yêu cầu chỉ đường
-  const handleGetDirections = useCallback(() => {
-    if (!currentLocation || !selectedPlace) {
-      console.error('Missing current location or selected place');
-      return;
+  // Helper function to check if a route appears to be following roads
+  const isRouteFollowingRoads = (geometry: any): boolean => {
+    // Check if we have the coordinates array
+    if (!geometry || !geometry.coordinates || !Array.isArray(geometry.coordinates)) {
+      return false;
     }
     
-    setShowDirections(true);
-    fetchDirections();
-  }, [currentLocation, selectedPlace, travelMode]);
+    // Routes with very few points are suspicious
+    if (geometry.coordinates.length < 5) {
+      return false;
+    }
+    
+    // Check for non-linear path (real roads are rarely perfectly straight)
+    let directionChanges = 0;
+    for (let i = 1; i < geometry.coordinates.length - 1; i++) {
+      const prev = geometry.coordinates[i-1];
+      const curr = geometry.coordinates[i];
+      const next = geometry.coordinates[i+1];
+      
+      // Calculate direction vectors
+      const dir1 = [curr[0] - prev[0], curr[1] - prev[1]];
+      const dir2 = [next[0] - curr[0], next[1] - curr[1]];
+      
+      // Calculate angle change
+      const dotProduct = dir1[0] * dir2[0] + dir1[1] * dir2[1];
+      const mag1 = Math.sqrt(dir1[0] * dir1[0] + dir1[1] * dir1[1]);
+      const mag2 = Math.sqrt(dir2[0] * dir2[0] + dir2[1] * dir2[1]);
+      
+      if (mag1 === 0 || mag2 === 0) continue;
+      
+      const cosAngle = dotProduct / (mag1 * mag2);
+      
+      // Count significant direction changes
+      if (cosAngle < 0.995) {
+        directionChanges++;
+      }
+    }
+    
+    // If we have enough direction changes, it's likely following actual roads
+    return directionChanges >= 3;
+  };
 
   // Fetch directions data
-  const fetchDirections = useCallback(async () => {
+  const fetchDirections = useCallback(async (mode?: 'driving' | 'walking' | 'cycling') => {
     if (!currentLocation || !selectedPlace) return;
     
+    const activeMode = mode || travelMode;
+    console.log(`Fetching directions using ${activeMode} mode`);
+    
     try {
-      console.log('Fetching directions from', currentLocation, 'to', selectedPlace.coordinates);
-      
       // Get Mapbox token
       if (!mapboxToken) {
         throw new Error('Mapbox access token is missing');
       }
-
-      // Create the API URL
-      const url = `https://api.mapbox.com/directions/v5/mapbox/${travelMode}/` +
-                 `${currentLocation[0]},${currentLocation[1]};` +
-                 `${selectedPlace.coordinates[0]},${selectedPlace.coordinates[1]}` +
-                 `?steps=true&geometries=geojson&access_token=${mapboxToken}`;
+  
+      // Build Mapbox Directions API URL with optimized parameters for better routing
+      const url = `https://api.mapbox.com/directions/v5/mapbox/${activeMode}/` +
+                `${currentLocation[0]},${currentLocation[1]};` +
+                `${selectedPlace.coordinates[0]},${selectedPlace.coordinates[1]}` +
+                `?steps=true&geometries=geojson&alternatives=true&overview=full` +
+                `&language=vi` +
+                // Optimize route parameters based on transport mode
+                `${activeMode === 'cycling' ? '&exclude=motorway,ferry,toll' : ''}` +
+                `${activeMode === 'walking' ? '&exclude=motorway' : ''}` +
+                // In Vietnam, prefer using ways classified as dedicated cycling paths when cycling
+                `${activeMode === 'cycling' ? '&annotations=distance,duration,speed,congestion' : ''}` +
+                `&access_token=${mapboxToken}`;
       
       // Fetch directions
       const response = await fetch(url);
@@ -192,15 +231,32 @@ const EnhancedMapboxMap: React.FC<EnhancedMapboxMapProps> = ({ initialLocation }
       // Get the first route
       const route = data.routes[0];
       
+      // For cycling mode, validate the route to ensure it follows roads
+      if (activeMode === 'cycling' && !isRouteFollowingRoads(route.geometry)) {
+        console.warn('Cycling route appears invalid (possibly straight line). Trying walking mode instead.');
+        
+        // If we haven't already tried fallback, try walking mode
+        if (activeMode === 'cycling') {
+          return fetchDirections('walking');
+        }
+        
+        // If fallback also failed, we'll just use what we have
+      }
+      
       // Create GeoJSON for the route
       const routeGeoJson = {
         type: 'Feature',
-        properties: {},
+        properties: {
+          distance: route.distance,
+          duration: route.duration,
+          mode: activeMode
+        },
         geometry: route.geometry
       };
       
       // Set route data
       setRouteData(routeGeoJson as any);
+      setShowDirections(true);
       
       // Adjust the map to show the entire route
       if (mapRef.current && mapLoaded) {
@@ -213,9 +269,31 @@ const EnhancedMapboxMap: React.FC<EnhancedMapboxMapProps> = ({ initialLocation }
         }
       }
     } catch (error) {
-      console.error('Error fetching directions:', error);
+      console.error(`Error fetching ${activeMode} directions:`, error);
+      
+      // Try fallback transportation mode if primary mode fails
+      if (activeMode === 'cycling') {
+        console.log('Falling back to walking directions');
+        return fetchDirections('walking');
+      } else if (activeMode === 'walking') {
+        console.log('Falling back to driving directions');
+        return fetchDirections('driving');
+      } else {
+        // Show error to user
+        console.error('Could not fetch directions with any transportation mode');
+      }
     }
   }, [currentLocation, selectedPlace, travelMode, mapboxToken, mapLoaded]);
+  
+  // Handle get directions button click
+  const handleGetDirections = useCallback(() => {
+    if (!currentLocation || !selectedPlace) {
+      console.error('Missing current location or selected place');
+      return;
+    }
+    
+    fetchDirections();
+  }, [fetchDirections, currentLocation, selectedPlace]);
 
   // Clear route and reset selection
   const handleClearRoute = useCallback(() => {
@@ -293,31 +371,33 @@ const EnhancedMapboxMap: React.FC<EnhancedMapboxMapProps> = ({ initialLocation }
       }
     }
   }, [currentLocation, selectedTravelTime, travelMode, mapLoaded]);
-// Hàm trợ giúp để tính toán bounds từ mảng tọa độ
-function calculateBoundsFromCoordinates(coordinates: Coordinate[]): BoundingBox {
-  // Khởi tạo giá trị min/max với giá trị đầu tiên
-  if (coordinates.length === 0) {
-    // Nếu không có tọa độ nào, trả về bounds mặc định
-    return [[0, 0], [0, 0]];
+
+  // Hàm trợ giúp để tính toán bounds từ mảng tọa độ
+  function calculateBoundsFromCoordinates(coordinates: Coordinate[]): BoundingBox {
+    // Khởi tạo giá trị min/max với giá trị đầu tiên
+    if (coordinates.length === 0) {
+      // Nếu không có tọa độ nào, trả về bounds mặc định
+      return [[0, 0], [0, 0]];
+    }
+    
+    const firstCoord = coordinates[0];
+    let minLng = firstCoord[0];
+    let minLat = firstCoord[1];
+    let maxLng = firstCoord[0];
+    let maxLat = firstCoord[1];
+    
+    // Duyệt qua tất cả tọa độ để tìm min/max
+    for (const coord of coordinates) {
+      if (coord[0] < minLng) minLng = coord[0];
+      if (coord[1] < minLat) minLat = coord[1];
+      if (coord[0] > maxLng) maxLng = coord[0];
+      if (coord[1] > maxLat) maxLat = coord[1];
+    }
+    
+    // Trả về bounds dạng [[minLng, minLat], [maxLng, maxLat]]
+    return [[minLng, minLat], [maxLng, maxLat]];
   }
-  
-  const firstCoord = coordinates[0];
-  let minLng = firstCoord[0];
-  let minLat = firstCoord[1];
-  let maxLng = firstCoord[0];
-  let maxLat = firstCoord[1];
-  
-  // Duyệt qua tất cả tọa độ để tìm min/max
-  for (const coord of coordinates) {
-    if (coord[0] < minLng) minLng = coord[0];
-    if (coord[1] < minLat) minLat = coord[1];
-    if (coord[0] > maxLng) maxLng = coord[0];
-    if (coord[1] > maxLat) maxLat = coord[1];
-  }
-  
-  // Trả về bounds dạng [[minLng, minLat], [maxLng, maxLat]]
-  return [[minLng, minLat], [maxLng, maxLat]];
-}
+
   // Handle nearby places search
   const handleNearbyPlacesSearch = useCallback(async () => {
     if (!currentLocation) {
