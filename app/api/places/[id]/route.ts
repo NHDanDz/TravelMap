@@ -1,47 +1,150 @@
-import { NextResponse } from 'next/server';
-import { TripAdvisorService } from '@/services/tripAdvisorService';
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
+    const id = parseInt(params.id);
     
-    if (!id) {
+    // Kiểm tra ID hợp lệ
+    if (isNaN(id)) {
       return NextResponse.json(
-        { error: 'Missing place ID' },
+        { error: 'Invalid ID' },
         { status: 400 }
       );
     }
 
-    console.log('Fetching place details for ID:', id);
+    // Lấy thông tin chi tiết địa điểm
+    const place = await prisma.place.findUnique({
+      where: { id },
+      include: {
+        category: true,
+        city: true,
+        photos: true,
+        reviews: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                avatarUrl: true
+              }
+            }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          },
+          take: 10
+        },
+        nearbyFromPlaces: {
+          include: {
+            nearbyPlace: {
+              include: {
+                category: true,
+                photos: {
+                  where: { isPrimary: true },
+                  take: 1
+                }
+              }
+            }
+          },
+          take: 5
+        }
+      }
+    });
 
-    // Try to get place details from TripAdvisor
-    let placeDetails = null;
-    try {
-      placeDetails = await TripAdvisorService.getPlaceDetails(id);
-    } catch (error) {
-      console.error('Error fetching from TripAdvisor:', error);
-    }
-
-    if (!placeDetails) {
+    // Nếu không tìm thấy
+    if (!place) {
       return NextResponse.json(
-        { error: 'Place not found', id },
+        { error: 'Place not found' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(placeDetails);
+    return NextResponse.json(place);
   } catch (error) {
-    console.error('API Error:', error);
-    
+    console.error(`Error fetching place with ID ${params.id}:`, error);
     return NextResponse.json(
-      { 
-        error: 'Failed to fetch place details', 
-        details: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString()
-      },
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const id = parseInt(params.id);
+    
+    // Kiểm tra ID hợp lệ
+    if (isNaN(id)) {
+      return NextResponse.json(
+        { error: 'Invalid ID' },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    
+    // Cập nhật thông tin địa điểm
+    const updatedPlace = await prisma.place.update({
+      where: { id },
+      data: {
+        name: body.name,
+        address: body.address,
+        description: body.description,
+        latitude: body.latitude,
+        longitude: body.longitude,
+        imageUrl: body.imageUrl,
+        openingHours: body.openingHours,
+        contactInfo: body.contactInfo,
+        website: body.website,
+        avgDurationMinutes: body.avgDurationMinutes,
+        priceLevel: body.priceLevel,
+        categoryId: body.categoryId,
+        cityId: body.cityId
+      }
+    });
+
+    return NextResponse.json(updatedPlace);
+  } catch (error) {
+    console.error(`Error updating place with ID ${params.id}:`, error);
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const id = parseInt(params.id);
+    
+    // Kiểm tra ID hợp lệ
+    if (isNaN(id)) {
+      return NextResponse.json(
+        { error: 'Invalid ID' },
+        { status: 400 }
+      );
+    }
+
+    // Xóa địa điểm
+    await prisma.place.delete({
+      where: { id }
+    });
+
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (error) {
+    console.error(`Error deleting place with ID ${params.id}:`, error);
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
       { status: 500 }
     );
   }

@@ -1,0 +1,279 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_URL")
+}
+
+model User {
+  id                Int                @id @default(autoincrement())
+  username          String             @unique @db.VarChar(50)
+  email             String             @unique @db.VarChar(100)
+  passwordHash      String             @map("password_hash") @db.VarChar(255)
+  fullName          String?            @map("full_name") @db.VarChar(100)
+  avatarUrl         String?            @map("avatar_url")
+  createdAt         DateTime?          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime?          @default(now()) @map("updated_at") @db.Timestamptz(6)
+  placePhotos       PlacePhoto[]
+  reviews           Review[]
+  savedPlaces       SavedPlace[]
+  collaboratedTrips TripCollaborator[]
+  trips             Trip[]
+
+  @@map("users")
+}
+
+model Category {
+  id          Int     @id @default(autoincrement())
+  name        String  @db.VarChar(50)
+  icon        String? @db.VarChar(50)
+  description String?
+  places      Place[]
+
+  @@map("categories")
+}
+
+model City {
+  id          Int           @id @default(autoincrement())
+  name        String        @db.VarChar(100)
+  country     String        @db.VarChar(100)
+  description String?
+  imageUrl    String?       @map("image_url")
+  latitude    Decimal?      @db.Decimal(10, 7)
+  longitude   Decimal?      @db.Decimal(10, 7)
+  places      Place[]
+  trips       Trip[]
+  weatherData WeatherData[]
+
+  @@map("cities")
+}
+
+model Place {
+  id                  Int              @id @default(autoincrement())
+  name                String           @db.VarChar(150)
+  categoryId          Int?             @map("category_id")
+  cityId              Int?             @map("city_id")
+  address             String?
+  description         String?
+  latitude            Decimal          @db.Decimal(10, 7)
+  longitude           Decimal          @db.Decimal(10, 7)
+  imageUrl            String?          @map("image_url")
+  openingHours        String?          @map("opening_hours")
+  contactInfo         String?          @map("contact_info")
+  website             String?
+  avgDurationMinutes  Int?             @map("avg_duration_minutes")
+  priceLevel          String?          @map("price_level") @db.VarChar(10)
+  rating              Decimal?         @db.Decimal(3, 1)
+  createdAt           DateTime?        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime?        @default(now()) @map("updated_at") @db.Timestamptz(6)
+  itineraryItems      ItineraryItem[]
+  nearbyToPlaces      NearbyPlace[]    @relation("PlaceTo")
+  nearbyFromPlaces    NearbyPlace[]    @relation("PlaceFrom")
+  photos              PlacePhoto[]
+  category            Category?        @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  city                City?            @relation(fields: [cityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reviews             Review[]
+  savedBy             SavedPlace[]
+  fromTransportations Transportation[] @relation("FromPlace")
+  toTransportations   Transportation[] @relation("ToPlace")
+
+  @@index([categoryId], map: "idx_places_category")
+  @@index([cityId], map: "idx_places_city")
+  @@map("places")
+}
+
+model PlacePhoto {
+  id        Int       @id @default(autoincrement())
+  placeId   Int?      @map("place_id")
+  userId    Int?      @map("user_id")
+  url       String
+  caption   String?
+  isPrimary Boolean?  @default(false) @map("is_primary")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  place     Place?    @relation(fields: [placeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("place_photos")
+}
+
+model Review {
+  id        Int       @id @default(autoincrement())
+  userId    Int?      @map("user_id")
+  placeId   Int?      @map("place_id")
+  rating    Int
+  comment   String?
+  visitDate DateTime? @map("visit_date") @db.Date
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+  place     Place?    @relation(fields: [placeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user      User?     @relation(fields: [userId], references: [id], onUpdate: NoAction)
+
+  @@index([placeId], map: "idx_reviews_place")
+  @@index([userId], map: "idx_reviews_user")
+  @@map("reviews")
+}
+
+model SavedPlace {
+  id        Int       @id @default(autoincrement())
+  userId    Int?      @map("user_id")
+  placeId   Int?      @map("place_id")
+  notes     String?
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  place     Place?    @relation(fields: [placeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([userId, placeId])
+  @@index([placeId], map: "idx_saved_places_place")
+  @@index([userId], map: "idx_saved_places_user")
+  @@map("saved_places")
+}
+
+model Trip {
+  id            Int                @id @default(autoincrement())
+  userId        Int?               @map("user_id")
+  name          String             @db.VarChar(150)
+  destination   String             @db.VarChar(100)
+  cityId        Int?               @map("city_id")
+  startDate     DateTime           @map("start_date") @db.Date
+  endDate       DateTime           @map("end_date") @db.Date
+  description   String?
+  coverImageUrl String?            @map("cover_image_url")
+  status        String?            @default("draft") @db.VarChar(20)
+  isPublic      Boolean?           @default(false) @map("is_public")
+  createdAt     DateTime?          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime?          @default(now()) @map("updated_at") @db.Timestamptz(6)
+  collaborators TripCollaborator[]
+  days          TripDay[]
+  expenses      TripExpense[]
+  tags          TripTag[]
+  city          City?              @relation(fields: [cityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user          User?              @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([userId], map: "idx_trips_user")
+  @@map("trips")
+}
+
+model TripDay {
+  id             Int             @id @default(autoincrement())
+  tripId         Int?            @map("trip_id")
+  dayNumber      Int             @map("day_number")
+  date           DateTime        @db.Date
+  notes          String?
+  createdAt      DateTime?       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime?       @default(now()) @map("updated_at") @db.Timestamptz(6)
+  itineraryItems ItineraryItem[]
+  trip           Trip?           @relation(fields: [tripId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tripId, dayNumber])
+  @@index([tripId], map: "idx_trip_days_trip")
+  @@map("trip_days")
+}
+
+model ItineraryItem {
+  id                    Int       @id @default(autoincrement())
+  tripDayId             Int?      @map("trip_day_id")
+  placeId               Int?      @map("place_id")
+  startTime             DateTime? @map("start_time") @db.Time(6)
+  endTime               DateTime? @map("end_time") @db.Time(6)
+  durationMinutes       Int?      @map("duration_minutes")
+  notes                 String?
+  orderIndex            Int       @map("order_index")
+  transportationType    String?   @map("transportation_type") @db.VarChar(50)
+  transportationDetails String?   @map("transportation_details")
+  createdAt             DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+  place                 Place?    @relation(fields: [placeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tripDay               TripDay?  @relation(fields: [tripDayId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tripDayId, orderIndex])
+  @@index([placeId], map: "idx_itinerary_items_place")
+  @@index([tripDayId], map: "idx_itinerary_items_trip_day")
+  @@map("itinerary_items")
+}
+
+model TripCollaborator {
+  tripId          Int       @map("trip_id")
+  userId          Int       @map("user_id")
+  permissionLevel String?   @default("view") @map("permission_level") @db.VarChar(20)
+  createdAt       DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  trip            Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([tripId, userId])
+  @@map("trip_collaborators")
+}
+
+model Transportation {
+  id              Int      @id @default(autoincrement())
+  fromPlaceId     Int?     @map("from_place_id")
+  toPlaceId       Int?     @map("to_place_id")
+  mode            String   @db.VarChar(50)
+  durationMinutes Int?     @map("duration_minutes")
+  distanceKm      Decimal? @map("distance_km") @db.Decimal(10, 2)
+  estimatedCost   Decimal? @map("estimated_cost") @db.Decimal(10, 2)
+  fromPlace       Place?   @relation("FromPlace", fields: [fromPlaceId], references: [id], onUpdate: NoAction)
+  toPlace         Place?   @relation("ToPlace", fields: [toPlaceId], references: [id], onUpdate: NoAction)
+
+  @@map("transportation")
+}
+
+model Tag {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique @db.VarChar(50)
+  description String?
+  trips       TripTag[]
+
+  @@map("tags")
+}
+
+model TripTag {
+  tripId Int  @map("trip_id")
+  tagId  Int  @map("tag_id")
+  tag    Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  trip   Trip @relation(fields: [tripId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([tripId, tagId])
+  @@map("trip_tags")
+}
+
+model TripExpense {
+  id          Int       @id @default(autoincrement())
+  tripId      Int?      @map("trip_id")
+  category    String    @db.VarChar(50)
+  amount      Decimal   @db.Decimal(10, 2)
+  currency    String?   @default("VND") @db.VarChar(3)
+  description String?
+  date        DateTime? @db.Date
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  trip        Trip?     @relation(fields: [tripId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("trip_expenses")
+}
+
+model WeatherData {
+  id                  Int       @id @default(autoincrement())
+  cityId              Int?      @map("city_id")
+  date                DateTime  @db.Date
+  temperatureHigh     Decimal?  @map("temperature_high") @db.Decimal(5, 2)
+  temperatureLow      Decimal?  @map("temperature_low") @db.Decimal(5, 2)
+  condition           String?   @db.VarChar(50)
+  precipitationChance Decimal?  @map("precipitation_chance") @db.Decimal(5, 2)
+  createdAt           DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  city                City?     @relation(fields: [cityId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([cityId, date])
+  @@map("weather_data")
+}
+
+model NearbyPlace {
+  placeId       Int     @map("place_id")
+  nearbyPlaceId Int     @map("nearby_place_id")
+  distanceKm    Decimal @map("distance_km") @db.Decimal(10, 2)
+  nearbyPlace   Place   @relation("PlaceTo", fields: [nearbyPlaceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  place         Place   @relation("PlaceFrom", fields: [placeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([placeId, nearbyPlaceId])
+  @@map("nearby_places")
+}
