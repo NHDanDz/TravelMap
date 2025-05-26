@@ -223,15 +223,30 @@ export default function TripDetailsPage() {
   const [showTimePicker, setShowTimePicker] = useState<string | null>(null);
   
   // Fetch trip data (simulated)
-  useEffect(() => {
-    // In a real application, you would fetch the trip data from an API
-    // For now, we'll use our sample data
-    setTimeout(() => {
-      setTrip(sampleTrip);
-      setLoading(false);
-    }, 500);
-  }, [tripId]);
-  
+useEffect(() => {
+  // Check if trip data exists in localStorage (from AI generation)
+  const storedData = localStorage.getItem(`trip_${tripId}_data`);
+  if (storedData) {
+    try {
+      const { days } = JSON.parse(storedData);
+      setTrip(prevTrip => {
+        if (prevTrip) {
+          return {
+            ...prevTrip,
+            days: days
+          };
+        }
+        return prevTrip;
+      });
+    } catch (error) {
+      console.error('Error loading trip data:', error);
+    }
+  } else {
+    // Fallback to sample data
+    setTrip(sampleTrip);
+  }
+  setLoading(false);
+}, [tripId]);
   // Filter saved places based on search query
   const filteredPlaces = savedPlaces.filter(place =>
     place.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
