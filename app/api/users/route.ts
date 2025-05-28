@@ -1,6 +1,6 @@
-// app/api/users/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import bcrypt from 'bcrypt';
 
 // GET - Lấy danh sách users
 export async function GET() {
@@ -11,8 +11,8 @@ export async function GET() {
         username: true,
         email: true,
         fullName: true,
-        createdAt: true
-      }
+        createdAt: true,
+      },
     });
 
     return NextResponse.json(users);
@@ -29,43 +29,43 @@ export async function POST(request: NextRequest) {
     const { username, email, password, fullName } = body;
 
     if (!username || !email || !password) {
-      return NextResponse.json({ 
-        error: 'Missing required fields: username, email, password' 
-      }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Missing required fields: username, email, password' },
+        { status: 400 }
+      );
     }
 
-    // Hash password (trong production nên dùng bcrypt)
-    const passwordHash = Buffer.from(password).toString('base64'); // Temporary hash
+    // Hash password using bcrypt
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
 
     const user = await prisma.user.create({
       data: {
         username,
         email,
         fullName,
-        passwordHash
+        passwordHash,
       },
       select: {
         id: true,
         username: true,
         email: true,
         fullName: true,
-        createdAt: true
-      }
+        createdAt: true,
+      },
     });
 
     return NextResponse.json({
       success: true,
-      user
+      user,
     });
   } catch (error: any) {
     console.error('Error creating user:', error);
-    
+
     // Handle unique constraint violations
     if (error.code === 'P2002') {
       const field = error.meta?.target?.[0] || 'field';
-      return NextResponse.json({ 
-        error: `${field} already exists` 
-      }, { status: 409 });
+      return NextResponse.json({ error: `${field} already exists` }, { status: 409 });
     }
 
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

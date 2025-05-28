@@ -1,4 +1,3 @@
-// app/components/layout/SharedLayout.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -12,12 +11,22 @@ import {
   ChevronRight, Globe, Shield, Download, CheckCircle, 
   Menu, X, User, LogOut
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 // Navbar component
 export const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-  
+  const [user, setUser] = useState<{ username: string } | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 50) {
@@ -32,7 +41,14 @@ export const Navbar = () => {
       window.removeEventListener('scroll', handleScroll);
     };
   }, []);
-  
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    setUser(null);
+    setShowMobileMenu(false);
+    router.push('/auth');
+  };
+
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
       scrolled ? 'bg-white shadow-md py-3' : 'bg-white shadow-sm py-3'
@@ -73,21 +89,39 @@ export const Navbar = () => {
         </nav>
         
         <div className="flex items-center space-x-4">
-          <Link 
-            href="/auth" 
-            className={`font-medium hover:text-blue-500 transition-colors text-gray-700`}
-          >
-            Đăng nhập
-          </Link>
-          <Link 
-            href="/auth" 
-            className="bg-blue-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Đăng ký
-          </Link>
+          {user ? (
+            <>
+              <Link 
+                href="/account" 
+                className="font-medium text-gray-700 hover:text-blue-500 transition-colors"
+              >
+                Xin chào, {user.username}
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="font-medium text-red-600 hover:text-red-700 transition-colors"
+              >
+                Đăng xuất
+              </button>
+            </>
+          ) : (
+            <>
+              <Link 
+                href="/auth" 
+                className={`font-medium hover:text-blue-500 transition-colors text-gray-700`}
+              >
+                Đăng nhập
+              </Link>
+              <Link 
+                href="/auth" 
+                className="bg-blue-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Đăng ký
+              </Link>
+            </>
+          )}
         </div>
 
-        {/* Mobile Menu Button */}
         <button 
           className="md:hidden text-gray-600 focus:outline-none"
           onClick={() => setShowMobileMenu(!showMobileMenu)}
@@ -96,7 +130,6 @@ export const Navbar = () => {
         </button>
       </div>
       
-      {/* Mobile Navigation Menu */}
       {showMobileMenu && (
         <div className="md:hidden bg-white border-t border-gray-100 px-4 py-3 space-y-3 absolute w-full z-10 shadow-md">
           <Link 
@@ -127,22 +160,49 @@ export const Navbar = () => {
           >
             Liên hệ
           </Link>
-          <button className="flex items-center gap-2 py-2 text-gray-600 hover:text-gray-900 w-full">
-            <User className="h-5 w-5" />
-            <span>Tài khoản</span>
-          </button>
-          <div className="border-t border-gray-100 pt-2">
-            <button className="flex items-center gap-2 py-2 text-red-600 hover:text-red-700 w-full">
-              <LogOut className="h-5 w-5" />
-              <span>Đăng xuất</span>
-            </button>
-          </div>
+          {user ? (
+            <>
+              <Link
+                href="/account"
+                className="flex items-center gap-2 py-2 text-gray-600 hover:text-gray-900"
+                onClick={() => setShowMobileMenu(false)}
+              >
+                <User className="h-5 w-5" />
+                <span>Tài khoản ({user.username})</span>
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 py-2 text-red-600 hover:text-red-700 w-full"
+              >
+                <LogOut className="h-5 w-5" />
+                <span>Đăng xuất</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/auth"
+                className="flex items-center gap-2 py-2 text-gray-600 hover:text-gray-900"
+                onClick={() => setShowMobileMenu(false)}
+              >
+                <User className="h-5 w-5" />
+                <span>Đăng nhập</span>
+              </Link>
+              <Link
+                href="/auth"
+                className="flex items-center gap-2 py-2 text-blue-600 hover:text-blue-700"
+                onClick={() => setShowMobileMenu(false)}
+              >
+                <User className="h-5 w-5" />
+                <span>Đăng ký</span>
+              </Link>
+            </>
+          )}
         </div>
       )}
     </header>
   );
 };
-
 // Footer component
 export const Footer = () => {
   return (
@@ -276,9 +336,24 @@ export const Footer = () => {
     </footer>
   );
 };
-
 // Mobile Bottom Navigation
 export const MobileNavigation = () => {
+  const [user, setUser] = useState<{ username: string } | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    setUser(null);
+    router.push('/auth');
+  };
+
   return (
     <div className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-20">
       <div className="grid grid-cols-4 h-16">
@@ -296,18 +371,30 @@ export const MobileNavigation = () => {
           <MapPin className="h-6 w-6" />
           <span className="text-xs mt-1">Bản đồ</span>
         </Link>
-        <button
+        <Link
+          href="/saved"
           className="flex flex-col items-center justify-center text-gray-600 hover:text-blue-600"
         >
           <Star className="h-6 w-6" />
           <span className="text-xs mt-1">Đã lưu</span>
-        </button>
-        <button
-          className="flex flex-col items-center justify-center text-gray-600 hover:text-blue-600"
-        >
-          <User className="h-6 w-6" />
-          <span className="text-xs mt-1">Tài khoản</span>
-        </button>
+        </Link>
+        {user ? (
+          <Link
+            href="/account"
+            className="flex flex-col items-center justify-center text-gray-600 hover:text-blue-600"
+          >
+            <User className="h-6 w-6" />
+            <span className="text-xs mt-1">Tài khoản</span>
+          </Link>
+        ) : (
+          <Link
+            href="/auth"
+            className="flex flex-col items-center justify-center text-gray-600 hover:text-blue-600"
+          >
+            <User className="h-6 w-6" />
+            <span className="text-xs mt-1">Tài khoản</span>
+          </Link>
+        )}
       </div>
     </div>
   );

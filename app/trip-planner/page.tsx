@@ -716,10 +716,19 @@ export default function TripPlannerPage() {
   // Load trips on mount
 useEffect(() => {
   const loadTrips = async () => {
-    try {
-      // TODO: Lấy userId từ session/auth
-      const userId = "1"; // Tạm thời hardcode, sau này lấy từ authentication
+    try { 
+     // Lấy userId từ AuthService
+      const userId = AuthService.getUserId();
       
+      // Kiểm tra xác thực
+      if (!AuthService.isAuthenticated()) {
+        console.warn('User not authenticated, redirecting to login');
+        router.push('/auth');
+        return;
+      }
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }      
       const tripsData = await TripService.getTrips({ userId });
       setTrips(tripsData);
     } catch (error) {
@@ -777,7 +786,14 @@ useEffect(() => {
       try {
         await TripService.deleteTrip(tripToDelete);
         // Reload trips
-        const userId = "1"; // TODO: Lấy từ auth
+      const userId = AuthService.getUserId();
+      
+      // Kiểm tra xác thực
+      if (!AuthService.isAuthenticated()) {
+        console.warn('User not authenticated, redirecting to login');
+        router.push('/auth');
+        return;
+      }
         const tripsData = await TripService.getTrips({ userId });
         setTrips(tripsData);
         

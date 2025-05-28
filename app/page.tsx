@@ -6,16 +6,30 @@ import { FaApple } from 'react-icons/fa';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { 
   MapPin, Compass, ArrowRight, Search, Star, 
   Calendar, Users, Coffee, Hotel, Utensils, Landmark,
   ChevronRight, Globe, Shield, Download, CheckCircle
 } from 'lucide-react';
-
+import {Menu, X, User, LogOut } from 'lucide-react';
+// Navbar component
 // Navbar component
 const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
-  
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [user, setUser] = useState<{ username: string } | null>(null);
+  const router = useRouter();
+
+  // Kiểm tra trạng thái đăng nhập
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
+  // Xử lý scroll
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 50) {
@@ -30,7 +44,15 @@ const Navbar = () => {
       window.removeEventListener('scroll', handleScroll);
     };
   }, []);
-  
+
+  // Hàm đăng xuất
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    setUser(null);
+    setShowMobileMenu(false);
+    router.push('/auth');
+  };
+
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
       scrolled ? 'bg-white shadow-md py-3' : 'bg-transparent py-5'
@@ -79,22 +101,119 @@ const Navbar = () => {
         </nav>
         
         <div className="flex items-center space-x-4">
-          <Link 
-            href="/auth" 
-            className={`font-medium hover:text-blue-500 transition-colors ${
-              scrolled ? 'text-gray-700' : 'text-white'
-            }`}
-          >
-            Đăng nhập
-          </Link>
-          <Link 
-            href="/auth" 
-            className="bg-blue-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Đăng ký
-          </Link>
+          {user ? (
+            <>
+              <Link 
+                href="/account" 
+                className="font-medium text-gray-700 hover:text-blue-500 transition-colors"
+              >
+                Xin chào, {user.username}
+              </Link>
+              <button
+                onClick={handleLogout}
+                className={`font-medium hover:text-red-700 transition-colors ${
+                  scrolled ? 'text-red-600' : 'text-red-400'
+                }`}
+              >
+                Đăng xuất
+              </button>
+            </>
+          ) : (
+            <>
+              <Link 
+                href="/auth" 
+                className={`font-medium hover:text-blue-500 transition-colors ${
+                  scrolled ? 'text-gray-700' : 'text-white'
+                }`}
+              >
+                Đăng nhập
+              </Link>
+              <Link 
+                href="/auth" 
+                className="bg-blue-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Đăng ký
+              </Link>
+            </>
+          )}
         </div>
+
+        {/* Mobile Menu Button */}
+        <button 
+          className="md:hidden text-gray-600 focus:outline-none"
+          onClick={() => setShowMobileMenu(!showMobileMenu)}
+        >
+          {showMobileMenu ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
       </div>
+      
+      {/* Mobile Navigation Menu */}
+      {showMobileMenu && (
+        <div className="md:hidden bg-white border-t border-gray-100 px-4 py-3 space-y-3 absolute w-full z-10 shadow-md">
+          <Link 
+            href="/dashboard/Map" 
+            className="block py-2 text-gray-600 hover:text-gray-900"
+            onClick={() => setShowMobileMenu(false)}
+          >
+            Khám phá
+          </Link>
+          <Link 
+            href="/trip-planner" 
+            className="block py-2 text-gray-600 hover:text-gray-900"
+            onClick={() => setShowMobileMenu(false)}
+          >
+            Lịch trình
+          </Link>
+          <Link 
+            href="/about" 
+            className="block py-2 text-gray-600 hover:text-gray-900"
+            onClick={() => setShowMobileMenu(false)}
+          >
+            Giới thiệu
+          </Link>
+          <Link 
+            href="/contact" 
+            className="block py-2 text-gray-600 hover:text-gray-900"
+            onClick={() => setShowMobileMenu(false)}
+          >
+            Liên hệ
+          </Link>
+          {user ? (
+            <>
+              <div className="flex items-center gap-2 py-2 text-gray-600 hover:text-gray-900">
+                <User className="h-5 w-5" />
+                <span>{user.username}</span>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 py-2 text-red-600 hover:text-red-700 w-full"
+              >
+                <LogOut className="h-5 w-5" />
+                <span>Đăng xuất</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/auth"
+                className="flex items-center gap-2 py-2 text-gray-600 hover:text-gray-900"
+                onClick={() => setShowMobileMenu(false)}
+              >
+                <User className="h-5 w-5" />
+                <span>Đăng nhập</span>
+              </Link>
+              <Link
+                href="/auth"
+                className="flex items-center gap-2 py-2 text-blue-600 hover:text-blue-700"
+                onClick={() => setShowMobileMenu(false)}
+              >
+                <User className="h-5 w-5" />
+                <span>Đăng ký</span>
+              </Link>
+            </>
+          )}
+        </div>
+      )}
     </header>
   );
 };

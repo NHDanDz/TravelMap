@@ -10,7 +10,7 @@ import {
   Plus, Download, Printer, ArrowLeft, ArrowRight, MoreHorizontal,
   Save, Compass
 } from 'lucide-react';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { TripService } from '@/services/tripService';
 
 // Type definitions
@@ -604,7 +604,7 @@ const handleSaveItinerary = async () => {
                       </div>
                     ) : (
                       <DragDropContext onDragEnd={handleDragEnd}>
-                        <Droppable droppableId={day.dayNumber.toString()}>
+                        <Droppable droppableId={day.dayNumber.toString()}  isDropDisabled={true} isCombineEnabled={true}  >
                           {(provided) => (
                             <div
                               {...provided.droppableProps}

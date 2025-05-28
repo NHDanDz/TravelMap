@@ -3,10 +3,12 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id);
+    // ✅ Await params before using
+    const { id: idParam } = await params;
+    const id = parseInt(idParam);
     
     // Kiểm tra ID hợp lệ
     if (isNaN(id)) {
@@ -65,7 +67,7 @@ export async function GET(
 
     return NextResponse.json(place);
   } catch (error) {
-    console.error(`Error fetching place with ID ${params.id}:`, error);
+    console.error(`Error fetching place:`, error);
     return NextResponse.json(
       { error: 'Internal Server Error' },
       { status: 500 }
@@ -75,10 +77,12 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id);
+    // ✅ Await params before using
+    const { id: idParam } = await params;
+    const id = parseInt(idParam);
     
     // Kiểm tra ID hợp lệ
     if (isNaN(id)) {
@@ -112,7 +116,7 @@ export async function PUT(
 
     return NextResponse.json(updatedPlace);
   } catch (error) {
-    console.error(`Error updating place with ID ${params.id}:`, error);
+    console.error(`Error updating place:`, error);
     return NextResponse.json(
       { error: 'Internal Server Error' },
       { status: 500 }
@@ -122,10 +126,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id);
+    // ✅ Await params before using
+    const { id: idParam } = await params;
+    const id = parseInt(idParam);
     
     // Kiểm tra ID hợp lệ
     if (isNaN(id)) {
@@ -142,7 +148,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
-    console.error(`Error deleting place with ID ${params.id}:`, error);
+    console.error(`Error deleting place:`, error);
     return NextResponse.json(
       { error: 'Internal Server Error' },
       { status: 500 }

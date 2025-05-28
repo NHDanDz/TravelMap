@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { GripVertical, MapPin, RotateCw, Navigation } from 'lucide-react';
 import { Place } from '../types';
 
@@ -39,7 +39,7 @@ const RouteOptimizer = ({ savedPlaces, onOptimizeRoute, onStartNavigation }: Rou
       ) : (
         <>
           <DragDropContext onDragEnd={handleDragEnd}>
-            <Droppable droppableId="places">
+            <Droppable droppableId="places"  isDropDisabled={true} isCombineEnabled={true} >
               {(provided) => (
                 <div
                   {...provided.droppableProps}

@@ -1,10 +1,12 @@
-// app/auth/page.tsx
 'use client';
 
 import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Mail, Lock, User, Eye, EyeOff, ArrowRight, Facebook, Twitter, Github } from 'lucide-react';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { useRouter } from 'next/navigation';
 
 const AuthPage = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -13,26 +15,75 @@ const AuthPage = () => {
     name: '',
     email: '',
     password: '',
-    rememberMe: false
+    username: '',
+    rememberMe: false,
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (isLogin) {
-      console.log('Login with:', formData.email, formData.password);
-      // Handle login logic
-    } else {
-      console.log('Register with:', formData.name, formData.email, formData.password);
-      // Handle registration logic
+    setIsLoading(true);
+
+    try {
+      if (isLogin) {
+        // Đăng nhập
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Đăng nhập thất bại');
+        }
+
+        toast.success('Đăng nhập thành công!');
+        // Lưu thông tin user vào localStorage hoặc context nếu cần
+        if (formData.rememberMe) {
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
+        router.push('/dashboard'); // Chuyển hướng sau khi đăng nhập
+      } else {
+        // Đăng ký
+        const response = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: formData.username,
+            email: formData.email,
+            password: formData.password,
+            fullName: formData.name,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Đăng ký thất bại');
+        }
+
+        toast.success('Đăng ký thành công! Vui lòng đăng nhập.');
+        setIsLogin(true); // Chuyển sang form đăng nhập
+        setFormData({ name: '', email: '', password: '', username: '', rememberMe: false });
+      }
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -41,22 +92,19 @@ const AuthPage = () => {
       {/* Left: Image */}
       <div className="hidden lg:block lg:w-1/2 relative">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/40 to-indigo-700/40 z-10"></div>
-        <Image
-          src="/images/ha-noi.jpg"
-          alt="TravelSense"
-          fill
-          className="object-cover"
-        />
+        <Image src="/images/ha-noi.jpg" alt="TravelSense" fill className="object-cover" />
         <div className="relative z-20 flex flex-col justify-between h-full p-12 text-white">
           <div>
             <Link href="/" className="flex items-center">
               <svg className="h-10 w-10 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2C8.13 2 5 5.13 5 9C5 14.25 12 22 12 22C12 22 19 14.25 19 9C19 5.13 15.87 2 12 2ZM12 11.5C10.62 11.5 9.5 10.38 9.5 9C9.5 7.62 10.62 6.5 12 6.5C13.38 6.5 14.5 7.62 14.5 9C14.5 10.38 13.38 11.5 12 11.5Z" fill="currentColor"/>
+                <path
+                  d="M12 2C8.13 2 5 5.13 5 9C5 14.25 12 22 12 22C12 22 19 14.25 19 9C19 5.13 15.87 2 12 2ZM12 11.5C10.62 11.5 9.5 10.38 9.5 9C9.5 7.62 10.62 6.5 12 6.5C13.38 6.5 14.5 7.62 14.5 9C14.5 10.38 13.38 11.5 12 11.5Z"
+                  fill="currentColor"
+                />
               </svg>
               <span className="text-2xl font-bold">TravelSense</span>
             </Link>
           </div>
-          
           <div>
             <h1 className="text-4xl md:text-5xl font-bold mb-6">Khám phá thế giới với TravelSense</h1>
             <p className="text-xl text-white/90 mb-8">
@@ -77,13 +125,10 @@ const AuthPage = () => {
               </div>
             </div>
           </div>
-          
-          <div className="text-sm text-white/70">
-            © 2025 TravelSense. All rights reserved.
-          </div>
+          <div className="text-sm text-white/70">© 2025 TravelSense. All rights reserved.</div>
         </div>
       </div>
-      
+
       {/* Right: Auth Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
@@ -92,13 +137,10 @@ const AuthPage = () => {
               {isLogin ? 'Chào mừng trở lại!' : 'Tạo tài khoản mới'}
             </h2>
             <p className="text-gray-600">
-              {isLogin 
-                ? 'Đăng nhập để tiếp tục hành trình của bạn' 
-                : 'Đăng ký để khám phá những địa điểm tuyệt vời'
-              }
+              {isLogin ? 'Đăng nhập để tiếp tục hành trình của bạn' : 'Đăng ký để khám phá những địa điểm tuyệt vời'}
             </p>
           </div>
-          
+
           <div className="bg-white rounded-xl shadow-lg p-8">
             {/* Social Sign In */}
             <div className="mb-6">
@@ -113,38 +155,58 @@ const AuthPage = () => {
                   <Github className="w-5 h-5 text-gray-800" />
                 </button>
               </div>
-              
               <div className="flex items-center my-4">
                 <div className="flex-grow border-t border-gray-300"></div>
                 <span className="mx-3 text-sm text-gray-500">hoặc</span>
                 <div className="flex-grow border-t border-gray-300"></div>
               </div>
             </div>
-            
+
             <form onSubmit={handleSubmit}>
               {!isLogin && (
-                <div className="mb-4">
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                    Họ và tên
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <User className="h-5 w-5 text-gray-400" />
+                <>
+                  <div className="mb-4">
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                      Họ và tên
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <User className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        id="name"
+                        name="name"
+                        type="text"
+                        value={formData.name}
+                        onChange={handleChange}
+                        required={!isLogin}
+                        className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Nhập họ và tên của bạn"
+                      />
                     </div>
-                    <input
-                      id="name"
-                      name="name"
-                      type="text"
-                      value={formData.name}
-                      onChange={handleChange}
-                      required={!isLogin}
-                      className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Nhập họ và tên của bạn"
-                    />
                   </div>
-                </div>
+                  <div className="mb-4">
+                    <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+                      Tên đăng nhập
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <User className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        id="username"
+                        name="username"
+                        type="text"
+                        value={formData.username}
+                        onChange={handleChange}
+                        required={!isLogin}
+                        className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Nhập tên đăng nhập"
+                      />
+                    </div>
+                  </div>
+                </>
               )}
-              
               <div className="mb-4">
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
                   Email
@@ -165,7 +227,6 @@ const AuthPage = () => {
                   />
                 </div>
               </div>
-              
               <div className="mb-4">
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                   Mật khẩu
@@ -182,7 +243,7 @@ const AuthPage = () => {
                     onChange={handleChange}
                     required
                     className="block w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder={isLogin ? "Nhập mật khẩu" : "Tạo mật khẩu"}
+                    placeholder={isLogin ? 'Nhập mật khẩu' : 'Tạo mật khẩu'}
                   />
                   <button
                     type="button"
@@ -197,7 +258,6 @@ const AuthPage = () => {
                   </button>
                 </div>
               </div>
-              
               {isLogin && (
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center">
@@ -213,7 +273,6 @@ const AuthPage = () => {
                       Ghi nhớ đăng nhập
                     </label>
                   </div>
-                  
                   <div className="text-sm">
                     <a href="#" className="font-medium text-blue-600 hover:text-blue-500">
                       Quên mật khẩu?
@@ -221,17 +280,17 @@ const AuthPage = () => {
                   </div>
                 </div>
               )}
-              
               <button
                 type="submit"
-                className="w-full flex items-center justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                disabled={isLoading}
+                className="w-full flex items-center justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-400"
               >
                 <span>{isLogin ? 'Đăng nhập' : 'Đăng ký'}</span>
                 <ArrowRight className="ml-2 h-4 w-4" />
               </button>
             </form>
           </div>
-          
+
           <div className="text-center mt-6">
             <p className="text-gray-600">
               {isLogin ? 'Chưa có tài khoản? ' : 'Đã có tài khoản? '}
@@ -245,6 +304,7 @@ const AuthPage = () => {
           </div>
         </div>
       </div>
+      <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );
 };

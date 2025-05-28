@@ -1,5 +1,3 @@
-// lib/auth.ts - Temporary authentication solution
-
 export interface User {
   id: string;
   username: string;
@@ -7,43 +5,80 @@ export interface User {
   fullName?: string;
 }
 
-// Temporary user cho development
-// NOTE: Sau khi chạy create-test-user.js, update ID này
-const TEMP_USER: User = {
-  id: "1", // TODO: Update này sau khi tạo user trong DB
-  username: "testuser",
-  email: "test@example.com",
-  fullName: "Test User"
-};
-
 export class AuthService {
-  // Lấy current user (temporary)
-  static getCurrentUser(): User {
-    // TODO: Implement real authentication
-    // Có thể lấy từ JWT token, session, etc.
-    return TEMP_USER;
+  // Key để lưu user trong localStorage
+  private static readonly USER_STORAGE_KEY = 'user';
+
+  // Lấy current user từ localStorage
+  static getCurrentUser(): User | null {
+    try {
+      const userData = localStorage.getItem(this.USER_STORAGE_KEY);
+      if (!userData) {
+        return null;
+      }
+      const user: User = JSON.parse(userData);
+      // Kiểm tra định dạng user
+      if (!user.id || !user.username || !user.email) {
+        console.warn('Invalid user data in localStorage');
+        this.logout(); // Xóa dữ liệu không hợp lệ
+        return null;
+      }
+      return user;
+    } catch (error) {
+      console.error('Error parsing user from localStorage:', error);
+      this.logout(); // Xóa dữ liệu nếu lỗi
+      return null;
+    }
   }
 
   // Lấy user ID
   static getUserId(): string {
-    return this.getCurrentUser().id;
+    const user = this.getCurrentUser();
+    if (!user) {
+      throw new Error('No authenticated user found');
+    }
+    return user.id;
   }
 
   // Check if user is authenticated
   static isAuthenticated(): boolean {
-    // TODO: Implement real authentication check
-    return true;
+    return !!this.getCurrentUser();
   }
 
-  // Tạo user mới (để test)
+  // Lưu user vào localStorage sau khi đăng nhập
+  static login(user: User): void {
+    try {
+      localStorage.setItem(this.USER_STORAGE_KEY, JSON.stringify(user));
+    } catch (error) {
+      console.error('Error saving user to localStorage:', error);
+    }
+  }
+
+  // Xóa user khỏi localStorage khi đăng xuất
+  static logout(): void {
+    localStorage.removeItem(this.USER_STORAGE_KEY);
+  }
+
+  // Tạo user mới (cho test hoặc đăng ký)
   static async createUser(userData: {
     username: string;
     email: string;
     password: string;
     fullName?: string;
   }): Promise<User> {
-    // TODO: Implement real user creation
+    // TODO: Thay bằng API call thực tế tới backend
     console.log('Creating user:', userData);
-    return TEMP_USER;
+    
+    // Tạo user giả lập để test
+    const newUser: User = {
+      id: `user_${Date.now()}`, // Tạo ID tạm thời
+      username: userData.username,
+      email: userData.email,
+      fullName: userData.fullName,
+    };
+
+    // Lưu user mới vào localStorage (giả lập đăng nhập)
+    this.login(newUser);
+    return newUser;
   }
 }
