@@ -10,6 +10,8 @@ import {
   MoreHorizontal, Trash2, Edit, Share, Compass, Map, Heart, User,
   Sparkles, Loader2, Globe, Users, DollarSign, Tag
 } from 'lucide-react';
+import { TripService } from '@/services/tripService';
+import { AuthService } from '@/lib/auth';
 
 // Service imports
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8089';
@@ -181,7 +183,7 @@ class TravelAIService {
       const prompt = this.buildStandardPrompt(requestData);
       
       console.log('Sending standardized request:', requestData);
-
+      
       const response = await fetch(`${BACKEND_URL}/api/v1/chat/_chat_complete`, {
         method: 'POST',
         headers: {
@@ -216,65 +218,89 @@ class TravelAIService {
   }
 
   // Xây dựng prompt chuẩn
-  private static buildStandardPrompt(request: TripRequest): string {
-    const startDate = new Date(request.startDate);
-    const endDate = new Date(request.endDate);
-    
-    return `Tạo lịch trình du lịch ${request.destination} ${request.duration} ngày.
+  // Cập nhật buildStandardPrompt trong TravelAIService
+private static buildStandardPrompt(request: TripRequest): string {
+  const startDate = new Date(request.startDate);
+  const endDate = new Date(request.endDate);
 
+  return `Tạo lịch trình du lịch ${request.destination} ${request.duration} ngày.
 THÔNG TIN CHUYẾN ĐI:
-- Điểm đến: ${request.destination}
-- Ngày bắt đầu: ${request.startDate} 
-- Ngày kết thúc: ${request.endDate}
-- Số ngày: ${request.duration}
-- Số người: ${request.travelers}
-- Ngân sách: ${request.budget ? this.formatCurrency(request.budget) : 'Không giới hạn'}
-- Sở thích: ${request.preferences || 'Không có yêu cầu đặc biệt'}
-- Thể loại: ${request.tags.length > 0 ? request.tags.join(', ') : 'Chung'}
 
-YÊU CẦU ĐỊNH DẠNG JSON:
+Điểm đến: ${request.destination}
+Ngày bắt đầu: ${request.startDate}
+Ngày kết thúc: ${request.endDate}
+Số ngày: ${request.duration}
+Số người: ${request.travelers}
+Ngân sách: ${request.budget ? this.formatCurrency(request.budget) : 'Không giới hạn'}
+Sở thích: ${request.preferences || 'Không có yêu cầu đặc biệt'}
+Thể loại: ${request.tags.length > 0 ? request.tags.join(', ') : 'Chung'}
+YÊU CẦU ĐỊNH DẠNG JSON CHUẨN DATABASE:
 {
-  "tripName": "tên chuyến đi phù hợp",
-  "destination": "${request.destination}",
-  "duration": ${request.duration},
-  "estimatedBudget": tổng ngân sách dự kiến (VND),
-  "itinerary": [
-    {
-      "day": 1,
-      "date": "${this.formatDate(startDate, 0)}",
-      "theme": "chủ đề của ngày",
-      "activities": [
-        {
-          "name": "tên hoạt động cụ thể",
-          "time": "09:00 hoặc Morning/Afternoon/Evening", 
-          "duration": 120,
-          "location": {
-            "name": "tên địa điểm chính xác",
-            "address": "địa chỉ đầy đủ",
-            "coordinates": {
-              "latitude": tọa độ thực,
-              "longitude": tọa độ thực
-            }
-          },
-          "type": "restaurant|tourist_attraction|activity|accommodation|shopping",
-          "description": "mô tả chi tiết hoạt động",
-          "estimatedCost": chi phí dự kiến (VND),
-          "rating": điểm đánh giá 1-5,
-          "notes": "lưu ý thêm"
-        }
-      ]
-    }
-  ]
+"tripName": "tên chuyến đi phù hợp",
+"destination": "${request.destination}",
+"duration": ${request.duration},
+"estimatedBudget": tổng ngân sách dự kiến (VND),
+"itinerary": [
+{
+"day": 1,
+"date": "${this.formatDate(startDate, 0)}",
+"theme": "chủ đề của ngày",
+"activities": [
+{
+"name": "tên hoạt động cụ thể",
+"time": "${this.formatDate(startDate, 0)}T09:00:00+07:00",
+"duration": 120,
+"location": {
+"name": "tên địa điểm chính xác",
+"address": "địa chỉ đầy đủ",
+"coordinates": {
+"latitude": 21.0285,
+"longitude": 105.8542
+}
+},
+"type": "restaurant|tourist_attraction|cafe|hotel|shopping",
+"description": "mô tả chi tiết hoạt động",
+"estimatedCost": chi phí dự kiến (VND),
+"rating": 4.5,
+"notes": "lưu ý thêm"
+}
+]
+}
+]
 }
 
-LƯU Ý:
-- Tọa độ phải chính xác (latitude, longitude thực tế)
-- Thời gian hợp lý (9:00-22:00)  
-- Chi phí thực tế theo thị trường VN
-- Địa chỉ cụ thể, có thể tìm thấy
-- CHỈ trả về JSON, không có text thừa hoặc markdown`;
-  }
+QUAN TRỌNG - ĐỊNH DẠNG DỮ LIỆU:
 
+time: Sử dụng định dạng ISO-8601 DateTime, kết hợp ngày (date) của ngày đó với thời gian cụ thể (ví dụ: "${this.formatDate(startDate, 0)}T09:00:00+07:00")
+KHÔNG dùng "Morning", "Afternoon", "Evening" hoặc định dạng "HH:MM"
+Thời gian từ 06:00 đến 22:00, sử dụng múi giờ +07:00 (Việt Nam)
+coordinates: Sử dụng tọa độ thực của ${request.destination}
+latitude: số thập phân (ví dụ: 21.0285)
+longitude: số thập phân (ví dụ: 105.8542)
+type: CHỈ sử dụng các giá trị sau:
+"tourist_attraction" (cho điểm tham quan)
+"restaurant" (cho nhà hàng, quán ăn)
+"cafe" (cho quán cà phê)
+"hotel" (cho khách sạn, nơi ở)
+"shopping" (cho mua sắm)
+duration: Thời gian tính bằng phút (số nguyên)
+Tham quan: 60-180 phút
+Ăn uống: 60-90 phút
+Mua sắm: 90-120 phút
+rating: Số thập phân từ 1.0 đến 5.0
+estimatedCost: Số nguyên (VND), không có dấu phẩy
+address: Địa chỉ đầy đủ, cụ thể tại ${request.destination}
+VÍ DỤ THỜI GIAN HỢP LÝ (ĐỊNH DẠNG ISO-8601):
+
+"${this.formatDate(startDate, 0)}T08:00:00+07:00": Ăn sáng
+"${this.formatDate(startDate, 0)}T09:30:00+07:00": Tham quan điểm đầu tiên
+"${this.formatDate(startDate, 0)}T12:00:00+07:00": Ăn trưa
+"${this.formatDate(startDate, 0)}T14:00:00+07:00": Tham quan chiều
+"${this.formatDate(startDate, 0)}T17:30:00+07:00": Nghỉ ngơi/cafe
+"${this.formatDate(startDate, 0)}T19:00:00+07:00": Ăn tối
+"${this.formatDate(startDate, 0)}T21:00:00+07:00": Vui chơi tối
+CHỈ trả về JSON hợp lệ, không có markdown, không có text thừa.`;
+}
   // Xử lý và validate response
   private static parseAndValidateResponse(responseText: string, originalRequest: TripRequest): TripResponse {
     try {
@@ -432,42 +458,131 @@ LƯU Ý:
   }
 
   // Convert về format cũ để tương thích
-  static convertToTripFormat(tripResponse: TripResponse, startDate: string): { places: Place[], days: Day[] } {
-    const places: Place[] = [];
-    const days: Day[] = [];
+  // Cập nhật convertToTripFormat trong TravelAIService
 
-    tripResponse.itinerary.forEach((dayData, index) => {
-      const dayPlaces: Place[] = [];
-      
-      dayData.activities.forEach((activity, activityIndex) => {
-        const place: Place = {
-          id: `place_${dayData.day}_${activityIndex}_${Date.now()}`,
-          name: activity.name,
-          type: activity.type || 'tourist_attraction',
-          address: activity.location.address || activity.location.name,
-          latitude: activity.location.coordinates.latitude.toString(),
-          longitude: activity.location.coordinates.longitude.toString(), 
-          image: '/images/default-place.jpg',
-          startTime: activity.time,
-          duration: activity.duration,
-          rating: activity.rating,
-          notes: activity.description || activity.notes,
-          openingHours: ''
-        };
-        
-        dayPlaces.push(place);
-        places.push(place);
-      });
+static convertToTripFormat(tripResponse: TripResponse, startDate: string): { places: Place[], days: Day[] } {
+  const places: Place[] = [];
+  const days: Day[] = [];
 
-      days.push({
-        dayNumber: dayData.day,
-        date: dayData.date || this.formatDate(new Date(startDate), index),
-        places: dayPlaces
-      });
+  tripResponse.itinerary.forEach((dayData, index) => {
+    const dayPlaces: Place[] = [];
+    const dayDate = dayData.date || this.formatDate(new Date(startDate), index);
+
+    dayData.activities.forEach((activity, activityIndex) => {
+      // Phân tích thời gian
+      let startTime = activity.time;
+      let endTime: string | undefined;
+
+      // Chuẩn hóa định dạng thời gian nếu cần
+      if (startTime && !startTime.match(/^\d{2}:\d{2}$/)) {
+        startTime = this.normalizeTimeFormat(startTime);
+      }
+
+      // Chuyển đổi sang định dạng ISO-8601 DateTime
+      let startDateTime: string | undefined;
+      if (startTime) {
+        startDateTime = `${dayDate}T${startTime}:00Z`; // Kết hợp ngày và giờ
+      }
+
+      // Tính toán thời gian kết thúc nếu có thời lượng
+      if (startTime && activity.duration) {
+        endTime = this.calculateEndTime(startTime, activity.duration);
+        if (endTime) {
+          endTime = `${dayDate}T${endTime}:00Z`; // Kết hợp ngày và giờ
+        }
+      }
+
+      const place: Place = {
+        id: `place_${dayData.day}_${activityIndex}_${Date.now()}`,
+        name: activity.name,
+        type: this.validatePlaceType(activity.type),
+        address: activity.location.address || activity.location.name,
+        latitude: activity.location.coordinates.latitude.toString(),
+        longitude: activity.location.coordinates.longitude.toString(),
+        image: this.getDefaultImage(activity.type),
+        startTime: startDateTime, // Định dạng ISO-8601
+        endTime: endTime, // Định dạng ISO-8601
+        duration: activity.duration,
+        rating: activity.rating,
+        notes: activity.description || activity.notes,
+        openingHours: this.getDefaultOpeningHours(activity.type)
+      };
+
+      dayPlaces.push(place);
+      places.push(place);
     });
 
-    return { places, days };
+    days.push({
+      dayNumber: dayData.day,
+      date: dayDate,
+      places: dayPlaces
+    });
+  });
+
+  return { places, days };
+}
+// Helper methods
+private static normalizeTimeFormat(timeStr: string): string {
+  const lowerTime = timeStr.toLowerCase();
+  
+  if (lowerTime.includes('morning') || lowerTime.includes('sáng')) {
+    return '09:00';
+  } else if (lowerTime.includes('afternoon') || lowerTime.includes('chiều')) {
+    return '14:00';
+  } else if (lowerTime.includes('evening') || lowerTime.includes('tối')) {
+    return '18:00';
   }
+  
+  // Try to extract HH:MM pattern
+  const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})/);
+  if (timeMatch) {
+    const hour = parseInt(timeMatch[1]);
+    const minute = parseInt(timeMatch[2]);
+    return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+  }
+  
+  return '09:00'; // Default fallback
+}
+
+private static calculateEndTime(startTime: string, durationMinutes: number): string {
+  const [hours, minutes] = startTime.split(':').map(Number);
+  const startMinutes = hours * 60 + minutes;
+  const endMinutes = startMinutes + durationMinutes;
+  
+  const endHours = Math.floor(endMinutes / 60) % 24;
+  const endMins = endMinutes % 60;
+  
+  return `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;
+}
+
+private static validatePlaceType(type?: string): string {
+  const validTypes = ['tourist_attraction', 'restaurant', 'cafe', 'hotel', 'shopping'];
+  return validTypes.includes(type || '') ? type! : 'tourist_attraction';
+}
+
+private static getDefaultImage(type?: string): string {
+  const imageMap: Record<string, string> = {
+    'tourist_attraction': '/images/place-default.jpg',
+    'restaurant': '/images/restaurant-default.jpg',
+    'cafe': '/images/cafe-default.jpg',
+    'hotel': '/images/hotel-default.jpg',
+    'shopping': '/images/shopping-default.jpg'
+  };
+  
+  return imageMap[type || 'tourist_attraction'] || '/images/place-default.jpg';
+}
+
+private static getDefaultOpeningHours(type?: string): string {
+  const hoursMap: Record<string, string> = {
+    'tourist_attraction': '8:00 - 17:00',
+    'restaurant': '11:00 - 22:00',
+    'cafe': '7:00 - 22:00',
+    'hotel': '24/7',
+    'shopping': '9:00 - 21:00'
+  };
+  
+  return hoursMap[type || 'tourist_attraction'] || '9:00 - 17:00';
+}
 
   // Helper methods
   private static formatDate(date: Date, addDays: number = 0): string {
@@ -599,25 +714,24 @@ export default function TripPlannerPage() {
   ];
   
   // Load trips on mount
-  useEffect(() => {
-    const loadTrips = async () => {
-      try {
-        const storedTrips = localStorage.getItem('user_trips');
-        if (storedTrips) {
-          setTrips(JSON.parse(storedTrips));
-        } else {
-          setTrips(sampleTrips);
-        }
-      } catch (error) {
-        console.error('Error loading trips:', error);
-        setTrips(sampleTrips);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadTrips();
-  }, []);
+useEffect(() => {
+  const loadTrips = async () => {
+    try {
+      // TODO: Lấy userId từ session/auth
+      const userId = "1"; // Tạm thời hardcode, sau này lấy từ authentication
+      
+      const tripsData = await TripService.getTrips({ userId });
+      setTrips(tripsData);
+    } catch (error) {
+      console.error('Error loading trips:', error);
+      setTrips(sampleTrips); // Fallback về sample data
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  loadTrips();
+}, []);
   
   // Save trips to localStorage whenever they change
   useEffect(() => {
@@ -658,12 +772,21 @@ export default function TripPlannerPage() {
   };
   
   // Confirm delete
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (tripToDelete) {
-      setTrips(trips.filter(trip => trip.id !== tripToDelete));
-      localStorage.removeItem(`trip_${tripToDelete}_data`);
-      setTripToDelete(null);
-      setIsDeleting(false);
+      try {
+        await TripService.deleteTrip(tripToDelete);
+        // Reload trips
+        const userId = "1"; // TODO: Lấy từ auth
+        const tripsData = await TripService.getTrips({ userId });
+        setTrips(tripsData);
+        
+        setTripToDelete(null);
+        setIsDeleting(false);
+      } catch (error) {
+        console.error('Error deleting trip:', error);
+        alert('Có lỗi xảy ra khi xóa lịch trình');
+      }
     }
   };
   
@@ -685,103 +808,116 @@ export default function TripPlannerPage() {
     );
   };
   
-  // Handle create trip với cấu trúc chuẩn
-  const handleCreateTrip = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!newTrip.destination || !newTrip.startDate || !newTrip.endDate) {
-      alert('Vui lòng điền đầy đủ thông tin bắt buộc');
-      return;
-    }
-    
-    const start = new Date(newTrip.startDate);
-    const end = new Date(newTrip.endDate);
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    
-    if (useAI) {
-      setIsGenerating(true);
-      try {
-        // Tạo request chuẩn
-        let fullPreferences = aiPreferences;
-        if (selectedTags.length > 0) {
-          fullPreferences += `. Quan tâm đến: ${selectedTags.join(', ')}`;
-        }
-        if (newTrip.estimatedBudget) {
-          fullPreferences += `. Ngân sách khoảng ${formatBudget(parseInt(newTrip.estimatedBudget))}`;
-        }
-        if (newTrip.travelCompanions && newTrip.travelCompanions !== '1') {
-          fullPreferences += `. Đi ${newTrip.travelCompanions} người`;
-        }
-
-        const tripRequest: TripRequest = {
-          destination: newTrip.destination,
-          startDate: newTrip.startDate,
-          endDate: newTrip.endDate,
-          duration: diffDays,
-          preferences: fullPreferences,
-          tags: selectedTags,
-          budget: newTrip.estimatedBudget ? parseInt(newTrip.estimatedBudget) : undefined,
-          travelers: parseInt(newTrip.travelCompanions),
-          language: 'vi'
-        };
-
-        const aiResponse = await TravelAIService.generateItinerary(tripRequest);
-        const { days } = TravelAIService.convertToTripFormat(aiResponse, newTrip.startDate);
-        
-        const trip: Trip = {
-          id: `trip_${Date.now()}`,
-          name: newTrip.name || aiResponse.tripName || `Khám phá ${newTrip.destination}`,
-          destination: newTrip.destination,
-          startDate: newTrip.startDate,
-          endDate: newTrip.endDate,
-          coverImage: '/images/default-trip.jpg',
-          numDays: diffDays,
-          placesCount: days.reduce((sum: number, day: any) => sum + day.places.length, 0),
-          status: 'draft',
-          description: newTrip.description || `Lịch trình ${diffDays} ngày khám phá ${newTrip.destination}`,
-          createdBy: 'ai',
-          tags: selectedTags,
-          estimatedBudget: aiResponse.estimatedBudget || (newTrip.estimatedBudget ? parseInt(newTrip.estimatedBudget) : undefined),
-          travelCompanions: parseInt(newTrip.travelCompanions)
-        };
-        
-        setTrips([trip, ...trips]);
-        localStorage.setItem(`trip_${trip.id}_data`, JSON.stringify({ days, originalResponse: aiResponse }));
-        
-        resetForm();
-        router.push(`/trip-planner/${trip.id}`);
-        
-      } catch (error) {
-        console.error('Error generating AI itinerary:', error);
-        alert('Có lỗi xảy ra khi tạo lịch trình bằng AI. Vui lòng thử lại sau.');
-      } finally {
-        setIsGenerating(false);
+ // Handle create trip với cấu trúc chuẩn
+const handleCreateTrip = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  // Validate required fields
+  if (!newTrip.destination || !newTrip.startDate || !newTrip.endDate) {
+    alert('Vui lòng điền đầy đủ thông tin bắt buộc');
+    return;
+  }
+  
+  // Calculate trip duration
+  const start = new Date(newTrip.startDate);
+  const end = new Date(newTrip.endDate);
+  
+  if (end <= start) {
+    alert('Ngày kết thúc phải sau ngày bắt đầu');
+    return;
+  }
+  
+  const diffTime = Math.abs(end.getTime() - start.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  
+  // Get current user ID
+  const userId = AuthService.getUserId();
+  
+  if (useAI) {
+    // AI-generated trip flow
+    setIsGenerating(true);
+    try {
+      // Build preferences string
+      let fullPreferences = aiPreferences;
+      if (selectedTags.length > 0) {
+        fullPreferences += `. Quan tâm đến: ${selectedTags.join(', ')}`;
       }
-    } else {
-      // Create manual trip
-      const trip: Trip = {
-        id: `trip_${Date.now()}`,
+      if (newTrip.estimatedBudget) {
+        fullPreferences += `. Ngân sách khoảng ${formatBudget(parseInt(newTrip.estimatedBudget))}`;
+      }
+      if (newTrip.travelCompanions && newTrip.travelCompanions !== '1') {
+        fullPreferences += `. Đi ${newTrip.travelCompanions} người`;
+      }
+
+      // Prepare AI request
+      const tripRequest: TripRequest = {
+        destination: newTrip.destination,
+        startDate: newTrip.startDate,
+        endDate: newTrip.endDate,
+        duration: diffDays,
+        preferences: fullPreferences,
+        tags: selectedTags,
+        budget: newTrip.estimatedBudget ? parseInt(newTrip.estimatedBudget) : undefined,
+        travelers: parseInt(newTrip.travelCompanions),
+        language: 'vi'
+      };
+
+      // Generate AI itinerary
+      const aiResponse = await TravelAIService.generateItinerary(tripRequest);
+      console.log('AI response:', aiResponse);
+      const { days } = TravelAIService.convertToTripFormat(aiResponse, newTrip.startDate);
+      
+      // Prepare trip data for database
+      const tripData = {
+        name: newTrip.name || aiResponse.tripName || `Khám phá ${newTrip.destination}`,
+        destination: newTrip.destination,
+        startDate: newTrip.startDate,
+        endDate: newTrip.endDate,
+        description: newTrip.description || `Lịch trình ${diffDays} ngày khám phá ${newTrip.destination} được tạo bởi AI`,
+        userId: userId,
+        status: 'draft' as const,
+        days: days
+      };
+      
+      // Create trip in database
+      const result = await TripService.createTrip(tripData);
+      
+      // Success - navigate to trip detail
+      resetForm();
+      router.push(`/trip-planner/${result.id}`);
+      
+    } catch (error) {
+      console.error('Error creating AI trip:', error);
+      alert('Có lỗi xảy ra khi tạo lịch trình bằng AI. Vui lòng thử lại sau.');
+    } finally {
+      setIsGenerating(false);
+    }
+  } else {
+    // Manual trip creation flow
+    try {
+      const tripData = {
         name: newTrip.name || `Khám phá ${newTrip.destination}`,
         destination: newTrip.destination,
         startDate: newTrip.startDate,
         endDate: newTrip.endDate,
-        coverImage: '/images/default-trip.jpg',
-        numDays: diffDays,
-        placesCount: 0,
-        status: 'draft',
         description: newTrip.description,
-        createdBy: 'manual',
-        tags: selectedTags,
-        estimatedBudget: newTrip.estimatedBudget ? parseInt(newTrip.estimatedBudget) : undefined,
-        travelCompanions: parseInt(newTrip.travelCompanions)
+        userId: userId,
+        status: 'draft' as const
       };
       
-      setTrips([trip, ...trips]);
+      // Create trip in database
+      const result = await TripService.createTrip(tripData);
+      
+      // Success - navigate to trip detail
       resetForm();
-      router.push(`/trip-planner/${trip.id}`);
+      router.push(`/trip-planner/${result.id}`);
+      
+    } catch (error) {
+      console.error('Error creating manual trip:', error);
+      alert('Có lỗi xảy ra khi tạo lịch trình. Vui lòng thử lại sau.');
     }
-  };
+  }
+};
   
   // Reset form
   const resetForm = () => {

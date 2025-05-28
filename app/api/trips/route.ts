@@ -1,46 +1,77 @@
+// app/api/trips/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
 
+// Helper function để parse time string
+// Helper function để parse time string
+function parseTimeString(timeStr: string, dayDate: string): string | null {
+  if (!timeStr) return null;
+
+  // Chuẩn hóa dayDate thành định dạng YYYY-MM-DD
+  const normalizedDate = new Date(dayDate).toISOString().split('T')[0];
+
+  // Nếu đã là format ISO-8601 hợp lệ
+  if (timeStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+07:00$/)) {
+    return timeStr;
+  }
+
+  // Nếu là format HH:MM hoặc HH:MM:SS
+  if (/^\d{2}:\d{2}(:\d{2})?$/.test(timeStr)) {
+    const time = timeStr.includes(':') && timeStr.split(':').length === 2 ? `${timeStr}:00` : timeStr;
+    return `${normalizedDate}T${time}+07:00`;
+  }
+
+  // Convert text time to HH:MM:SS
+  const lowerTime = timeStr.toLowerCase();
+  let time: string;
+
+  if (lowerTime.includes('morning') || lowerTime.includes('sáng')) {
+    time = '09:00:00';
+  } else if (lowerTime.includes('afternoon') || lowerTime.includes('chiều')) {
+    time = '14:00:00';
+  } else if (lowerTime.includes('evening') || lowerTime.includes('tối')) {
+    time = '18:00:00';
+  } else if (lowerTime.includes('night') || lowerTime.includes('đêm')) {
+    time = '20:00:00';
+  } else {
+    // Try to extract numbers from string
+    const timeMatch = timeStr.match(/(\d{1,2}):?(\d{2})?/);
+    if (timeMatch) {
+      const hour = parseInt(timeMatch[1]);
+      const minute = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
+      if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+        time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
+      } else {
+        time = '09:00:00'; // Fallback
+      }
+    } else {
+      time = '09:00:00'; // Fallback
+    }
+  }
+
+  return `${normalizedDate}T${time}+07:00`;
+}
+
+// GET - Lấy danh sách trips
 export async function GET(request: NextRequest) {
   try {
-    // Kiểm tra quyền truy cập
-    const session = await auth();
-    if (!session || !session.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const userId = session.user.id;
-    
-    // Lấy các tham số lọc từ URL
     const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
     const status = searchParams.get('status');
     const search = searchParams.get('search');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const page = parseInt(searchParams.get('page') || '1');
-    const skip = (page - 1) * limit;
 
-    // Xây dựng điều kiện lọc
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    }
+
     const where: any = {
-      OR: [
-        { userId },
-        {
-          collaborators: {
-            some: {
-              userId
-            }
-          }
-        }
-      ]
+      userId: parseInt(userId)
     };
-    
+
     if (status) {
       where.status = status;
     }
-    
+
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -49,117 +80,170 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    // Thực hiện truy vấn với Prisma
     const trips = await prisma.trip.findMany({
       where,
       include: {
-        city: true,
-        _count: {
-          select: {
-            days: true
+        days: {
+          include: {
+            itineraryItems: {
+              include: {
+                place: true
+              },
+              orderBy: { orderIndex: 'asc' }
+            }
+          },
+          orderBy: { dayNumber: 'asc' }
+        },
+        tags: {
+          include: {
+            tag: true
           }
-        }
+        },
+        city: true
       },
-      take: limit,
-      skip,
-      orderBy: {
-        updatedAt: 'desc'
-      }
+      orderBy: { createdAt: 'desc' }
     });
 
-    // Đếm tổng số chuyến đi phù hợp với bộ lọc
-    const total = await prisma.trip.count({ where });
+    // Transform data để match với frontend format
+    const transformedTrips = trips.map(trip => ({
+      id: trip.id.toString(),
+      name: trip.name,
+      destination: trip.destination,
+      startDate: trip.startDate.toISOString().split('T')[0],
+      endDate: trip.endDate.toISOString().split('T')[0],
+      coverImage: trip.coverImageUrl || '/images/default-trip.jpg',
+      numDays: Math.ceil((trip.endDate.getTime() - trip.startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1,
+      placesCount: trip.days.reduce((total, day) => total + day.itineraryItems.length, 0),
+      status: trip.status as 'draft' | 'planned' | 'completed',
+      description: trip.description,
+      createdBy: 'manual' as const, // Có thể thêm field này vào DB sau
+      tags: trip.tags.map(tripTag => tripTag.tag.name),
+      estimatedBudget: undefined, // Có thể tính từ expenses
+      travelCompanions: 1 // Có thể thêm field này vào DB
+    }));
 
-    // Trả về kết quả
-    return NextResponse.json({
-      trips,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit)
-      }
-    });
+    return NextResponse.json(transformedTrips);
   } catch (error) {
     console.error('Error fetching trips:', error);
-    return NextResponse.json(
-      { error: 'Internal Server Error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
+// POST - Tạo trip mới
 export async function POST(request: NextRequest) {
   try {
-    // Kiểm tra quyền truy cập
-    const session = await auth();
-    if (!session || !session.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const body = await request.json();
+    console.log(request.json());
+    const {
+      name,
+      destination,
+      startDate,
+      endDate,
+      description,
+      userId,
+      status = 'draft',
+      days = []
+    } = body;
+
+    if (!name || !destination || !startDate || !endDate || !userId) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const userId = session.user.id;
-    const body = await request.json();
-    
-    // Tạo chuyến đi mới
-    const newTrip = await prisma.trip.create({
-      data: {
-        userId,
-        name: body.name,
-        destination: body.destination,
-        startDate: body.startDate,
-        endDate: body.endDate,
-        description: body.description,
-        coverImageUrl: body.coverImageUrl,
-        status: body.status || 'draft',
-        isPublic: body.isPublic || false,
-        cityId: body.cityId
+    // Tạo trip với transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Tạo trip
+      const trip = await tx.trip.create({
+        data: {
+          name,
+          destination,
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+          description,
+          userId: parseInt(userId),
+          status,
+          coverImageUrl: '/images/default-trip.jpg'
+        }
+      });
+
+      // Tạo days và itinerary items nếu có
+      if (days && days.length > 0) {
+        for (const dayData of days) {
+          const tripDay = await tx.tripDay.create({
+            data: {
+              tripId: trip.id,
+              dayNumber: dayData.dayNumber,
+              date: new Date(dayData.date),
+              notes: dayData.notes
+            }
+          });
+
+          // Tạo places và itinerary items
+          if (dayData.places && dayData.places.length > 0) {
+            for (let i = 0; i < dayData.places.length; i++) {
+              const placeData = dayData.places[i];
+              
+              // Tìm hoặc tạo place
+              let place = await tx.place.findFirst({
+                where: {
+                  name: placeData.name,
+                  latitude: parseFloat(placeData.latitude),
+                  longitude: parseFloat(placeData.longitude)
+                }
+              });
+
+              if (!place) {
+                place = await tx.place.create({
+                  data: {
+                    name: placeData.name,
+                    address: placeData.address,
+                    latitude: parseFloat(placeData.latitude),
+                    longitude: parseFloat(placeData.longitude),
+                    imageUrl: placeData.image,
+                    openingHours: placeData.openingHours,
+                    avgDurationMinutes: placeData.duration,
+                    rating: placeData.rating ? parseFloat(placeData.rating.toString()) : null
+                  }
+                });
+              }
+
+              // Tạo itinerary item
+              await tx.itineraryItem.create({
+                data: {
+                  tripDayId: tripDay.id,
+                  placeId: place.id,
+                  startTime: placeData.startTime ? parseTimeString(placeData.startTime, dayData.date) : null,
+                  endTime: placeData.endTime ? parseTimeString(placeData.endTime, dayData.date) : null,
+                  durationMinutes: placeData.duration,
+                  notes: placeData.notes,
+                  orderIndex: i
+                }
+              });
+            }
+          }
+        }
+      }
+
+      return trip;
+    });
+
+    return NextResponse.json({ 
+      success: true,
+      tripId: result.id.toString(),
+      trip: {
+        id: result.id.toString(),
+        name: result.name,
+        destination: result.destination,
+        startDate: result.startDate.toISOString().split('T')[0],
+        endDate: result.endDate.toISOString().split('T')[0],
+        status: result.status,
+        description: result.description,
+        coverImageUrl: result.coverImageUrl,
+        createdAt: result.createdAt,
+        updatedAt: result.updatedAt
       }
     });
-    
-    // Tự động sinh các ngày trong chuyến đi
-    const startDate = new Date(body.startDate);
-    const endDate = new Date(body.endDate);
-    const days = [];
-    
-    let currentDate = new Date(startDate);
-    let dayNumber = 1;
-    
-    while (currentDate <= endDate) {
-      days.push({
-        tripId: newTrip.id,
-        dayNumber,
-        date: new Date(currentDate)
-      });
-      
-      currentDate.setDate(currentDate.getDate() + 1);
-      dayNumber++;
-    }
-    
-    if (days.length > 0) {
-      await prisma.tripDay.createMany({
-        data: days
-      });
-    }
-    
-    // Lấy chuyến đi đầy đủ với các ngày
-    const completeTrip = await prisma.trip.findUnique({
-      where: {
-        id: newTrip.id
-      },
-      include: {
-        days: true
-      }
-    });
-    
-    return NextResponse.json(completeTrip, { status: 201 });
   } catch (error) {
     console.error('Error creating trip:', error);
-    return NextResponse.json(
-      { error: 'Internal Server Error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

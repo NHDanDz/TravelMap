@@ -11,6 +11,7 @@ import {
   Save, Compass
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { TripService } from '@/services/tripService';
 
 // Type definitions
 interface Place {
@@ -223,29 +224,22 @@ export default function TripDetailsPage() {
   const [showTimePicker, setShowTimePicker] = useState<string | null>(null);
   
   // Fetch trip data (simulated)
+// Thay thế useEffect fetch trip data
 useEffect(() => {
-  // Check if trip data exists in localStorage (from AI generation)
-  const storedData = localStorage.getItem(`trip_${tripId}_data`);
-  if (storedData) {
+  const loadTripData = async () => {
     try {
-      const { days } = JSON.parse(storedData);
-      setTrip(prevTrip => {
-        if (prevTrip) {
-          return {
-            ...prevTrip,
-            days: days
-          };
-        }
-        return prevTrip;
-      });
+      const tripData = await TripService.getTripById(tripId);
+      setTrip(tripData);
     } catch (error) {
-      console.error('Error loading trip data:', error);
+      console.error('Error loading trip:', error);
+      // Fallback về sample data hoặc hiển thị error
+      setTrip(null);
+    } finally {
+      setLoading(false);
     }
-  } else {
-    // Fallback to sample data
-    setTrip(sampleTrip);
-  }
-  setLoading(false);
+  };
+  
+  loadTripData();
 }, [tripId]);
   // Filter saved places based on search query
   const filteredPlaces = savedPlaces.filter(place =>
@@ -390,11 +384,18 @@ useEffect(() => {
   };
   
   // Handle save itinerary
-  const handleSaveItinerary = () => {
-    // In a real app, you would save the trip data to an API
+const handleSaveItinerary = async () => {
+  if (!trip) return;
+  
+  try {
+    await TripService.updateTrip(trip.id, trip);
     alert('Lịch trình đã được lưu thành công!');
     setIsEditing(false);
-  };
+  } catch (error) {
+    console.error('Error saving trip:', error);
+    alert('Có lỗi xảy ra khi lưu lịch trình');
+  }
+};
   
   if (loading) {
     return (
