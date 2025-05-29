@@ -1,127 +1,466 @@
-// app/account/page.tsx
+// app/account/page.tsx - Tích hợp với Database
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { 
     User, Edit, MapPin, Heart, Clock, Settings, LogOut, Lock, 
     Camera, Award, Shield, Bell, Compass, UserCheck, Star, Calendar, 
-    ThumbsUp, Trash, Map
+    ThumbsUp, Trash, Map, Loader2
   } from 'lucide-react';
-// Dummy user data
-const userData = {
-  name: 'Nguyễn Hải Đăng',
-  email: 'nhdandz@gmail.com',
-  avatar: '/images/human-4.jpg',
-  joinDate: 'Tháng 10, 2003',
-  savedPlaces: 24,
-  completedTrips: 8,
-  reviewsCount: 15
-};
+import { useRouter } from 'next/navigation';  
+import { AuthService } from '@/lib/auth';
+
+
+interface EditModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  currentValue: string;
+  onSave: (newValue: string) => void;
+  placeholder?: string;
+  type?: 'text' | 'email';
+}
+
+// Interfaces
+interface UserData {
+  id: number;
+  name: string;
+  email: string;
+  username: string;
+  avatar: string;
+  joinDate: string;
+  savedPlaces: number;
+  completedTrips: number;
+  reviewsCount: number;
+}
+
+interface SavedPlace {
+  id: number;
+  name: string;
+  type: string;
+  address: string;
+  rating: number;
+  image: string;
+  savedAt: string;
+  notes?: string;
+}
+
+interface Review {
+  id: number;
+  placeName: string;
+  placeType: string;
+  rating: number;
+  content: string;
+  date: string;
+  likes: number;
+  visitDate?: string;
+}
+
+interface Trip {
+  id: string;
+  name: string;
+  destination: string;
+  startDate: string;
+  endDate: string;
+  coverImage: string;
+  numDays: number;
+  placesCount: number;
+  status: 'draft' | 'planned' | 'completed';
+}
 
 type TabType = 'profile' | 'saved' | 'trips' | 'reviews' | 'settings';
 
+
+const Notification: React.FC<{
+  notification: { type: 'success' | 'error'; message: string } | null;
+  onClose: () => void;
+}> = ({ notification, onClose }) => {
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification, onClose]);
+
+  if (!notification) return null;
+
+  return (
+    <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top duration-300">
+      <div className={`rounded-lg shadow-lg p-4 flex items-center space-x-3 ${
+        notification.type === 'success' 
+          ? 'bg-green-50 border border-green-200' 
+          : 'bg-red-50 border border-red-200'
+      }`}>
+        {notification.type === 'success' ? (
+          <div className="flex-shrink-0">
+            <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+          </div>
+        ) : (
+          <div className="flex-shrink-0">
+            <svg className="w-5 h-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+          </div>
+        )}
+        <p className={`text-sm font-medium ${
+          notification.type === 'success' ? 'text-green-800' : 'text-red-800'
+        }`}>
+          {notification.message}
+        </p>
+        <button
+          onClick={onClose}
+          className={`flex-shrink-0 rounded-full p-1 hover:bg-opacity-20 ${
+            notification.type === 'success' 
+              ? 'text-green-400 hover:bg-green-400' 
+              : 'text-red-400 hover:bg-red-400'
+          }`}
+        >
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+};
+
+
+const EditModal: React.FC<EditModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  title, 
+  currentValue, 
+  onSave, 
+  placeholder,
+  type = 'text'
+}) => {
+  const [value, setValue] = useState(currentValue);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    setValue(currentValue);
+  }, [currentValue, isOpen]);
+
+  const handleSave = async () => {
+    if (value.trim() === currentValue.trim()) {
+      onClose();
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await onSave(value.trim());
+      onClose();
+    } catch (error) {
+      console.error('Error saving:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSave();
+    } else if (e.key === 'Escape') {
+      onClose();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 animate-in fade-in zoom-in duration-200">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {title}
+            </label>
+            <input
+              type={type}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={placeholder}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              autoFocus
+            />
+          </div>
+          
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={onClose}
+              disabled={isLoading}
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+            >
+              Hủy
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isLoading || !value.trim()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center"
+            >
+              {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Lưu
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AccountPage = () => {
   const [activeTab, setActiveTab] = useState<TabType>('profile');
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{
+  type: 'success' | 'error';
+  message: string;
+} | null>(null);
+  // Pagination states
+  const [savedPlacesPage, setSavedPlacesPage] = useState(1);
+  const [reviewsPage, setReviewsPage] = useState(1);
+  const [selectedCategory, setSelectedCategory] = useState('Tất cả');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [editModal, setEditModal] = useState<{
+    isOpen: boolean;
+    type: 'name' | 'email' | 'username' | null;
+    title: string;
+    currentValue: string;
+  }>({
+    isOpen: false,
+    type: null,
+    title: '',
+    currentValue: ''
+  });
+  const router = useRouter();   
   
-  // Saved places mock data
-  const savedPlaces = [
-    {
-      id: 1,
-      name: 'Nhà hàng Sài Gòn Xưa',
-      type: 'restaurant',
-      address: '123 Đường Nguyễn Huệ, Quận 1, TP.HCM',
-      rating: 4.7,
-      image: '/images/place-1.jpg'
-    },
-    {
-      id: 2,
-      name: 'Khách sạn Continental',
-      type: 'hotel',
-      address: '132-134 Đồng Khởi, Quận 1, TP.HCM',
-      rating: 4.9,
-      image: '/images/place-2.jpg'
-    },
-    {
-      id: 3,
-      name: 'Bảo tàng Lịch sử quân sự Việt Nam',
-      type: 'museum',
-      address: 'Đại lộ Thăng Long, Tây Mỗ, Đại Mỗ, Nam Từ Liêm, Hà Nội',
-      rating: 4.5,
-      image: '/images/place-3.jpg'
-    },
-    {
-      id: 4,
-      name: 'The Coffee House',
-      type: 'cafe',
-      address: '92 Lê Lợi, Quận 1, TP.HCM',
-      rating: 4.3,
-      image: '/images/place-4.jpg'
+  // Kiểm tra xác thực
+useEffect(() => {
+  try {
+    if (!AuthService.isAuthenticated()) {
+      console.warn('User not authenticated, redirecting to login');
+      router.push('/auth');
+      return;
     }
-  ];
+    const userId = AuthService.getUserId();
+    setCurrentUserId(userId);
+  } catch (error) {
+    console.error('Authentication error:', error);
+    router.push('/auth');
+  }
+}, [router]);
+  // Fetch user data
+useEffect(() => {
+  if (currentUserId) {
+    fetchUserData();
+  }
+}, [currentUserId]);
 
-  // Trips mock data
-  const trips = [
-    {
-      id: 1,
-      name: 'Khám phá Sài Gòn',
-      startDate: '12/05/2023',
-      endDate: '15/05/2023',
-      placesCount: 8,
-      status: 'completed',
-      coverImage: '/images/sai-gon.jpg'
-    },
-    {
-      id: 2,
-      name: 'Chuyến đi Đà Lạt',
-      startDate: '20/06/2023',
-      endDate: '25/06/2023',
-      placesCount: 12,
-      status: 'completed',
-      coverImage: '/images/da-lat.jpg'
-    },
-    {
-      id: 3,
-      name: 'Khám phá Hà Nội',
-      startDate: '10/07/2023',
-      endDate: '15/07/2023',
-      placesCount: 10,
-      status: 'planned',
-      coverImage: '/images/ha-noi.jpg'
-    }
-  ];
 
-  // Reviews mock data
-  const reviews = [
-    {
-      id: 1,
-      placeName: 'Nhà hàng Sài Gòn Xưa',
-      placeType: 'restaurant',
-      rating: 5,
-      content: 'Món ăn ngon, không gian thoáng mát và dịch vụ rất tốt. Nhất định sẽ quay lại lần sau!',
-      date: '20/05/2023',
-      likes: 12
-    },
-    {
-      id: 2,
-      placeName: 'Khách sạn Continental',
-      placeType: 'hotel',
-      rating: 4,
-      content: 'Khách sạn có vị trí thuận lợi, phòng rộng rãi và sạch sẽ. Nhân viên thân thiện và nhiệt tình.',
-      date: '25/06/2023',
-      likes: 8
-    },
-    {
-      id: 3,
-      placeName: 'Bảo tàng Lịch sử quân sự Việt Nam',
-      placeType: 'museum',
-      rating: 5,
-      content: 'Một nơi tuyệt vời để tìm hiểu về lịch sử Việt Nam. Nhiều hiện vật quý giá và thông tin hữu ích.',
-      date: '15/07/2023',
-      likes: 15
+  // Fetch tab-specific data when tab changes
+  useEffect(() => {
+    if (!currentUserId) return;
+    switch (activeTab) {
+      case 'saved':
+        fetchSavedPlaces();
+        break;
+      case 'reviews':
+        fetchReviews();
+        break;
+      case 'trips':
+        fetchTrips();
+        break;
     }
-  ];
+  }, [activeTab, savedPlacesPage, reviewsPage, selectedCategory, currentUserId]);
+
+  const fetchUserData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/account?userId=${currentUserId}`);
+      if (!response.ok) throw new Error('Failed to fetch user data');
+      
+      const data = await response.json();
+      setUserData({
+        ...data,
+        joinDate: new Date(data.joinDate).toLocaleDateString('vi-VN', {
+          year: 'numeric',
+          month: 'long'
+        })
+      });
+    } catch (err) {
+      setError('Không thể tải thông tin tài khoản');
+      console.error('Error fetching user data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  
+// Hàm mở modal chỉnh sửa
+const openEditModal = (type: 'name' | 'email' | 'username', title: string, currentValue: string) => {
+  setEditModal({
+    isOpen: true,
+    type,
+    title,
+    currentValue
+  });
+};
+
+// Hàm xử lý lưu từ modal
+const handleSaveFromModal = async (newValue: string) => {
+  if (!editModal.type || !userData) return;
+  
+  const updateData: Partial<UserData> = {};
+  updateData[editModal.type] = newValue;
+  
+  await handleUpdateProfile(updateData);
+};
+
+  const fetchSavedPlaces = async () => {
+    try {
+      const response = await fetch(
+        `/api/account/saved-places?userId=${currentUserId}&page=${savedPlacesPage}&category=${selectedCategory}`
+      );
+      if (!response.ok) throw new Error('Failed to fetch saved places');
+      
+      const data = await response.json();
+      setSavedPlaces(data.places);
+    } catch (err) {
+      console.error('Error fetching saved places:', err);
+    }
+  };
+
+  const fetchReviews = async () => {
+    try {
+      const response = await fetch(
+        `/api/account/reviews?userId=${currentUserId}&page=${reviewsPage}`
+      );
+      if (!response.ok) throw new Error('Failed to fetch reviews');
+      
+      const data = await response.json();
+      setReviews(data.reviews);
+    } catch (err) {
+      console.error('Error fetching reviews:', err);
+    }
+  };
+
+  const fetchTrips = async () => {
+    try {
+      const response = await fetch(`/api/trips?userId=${currentUserId}`);
+      if (!response.ok) throw new Error('Failed to fetch trips');
+      
+      const data = await response.json();
+      setTrips(data);
+    } catch (err) {
+      console.error('Error fetching trips:', err);
+    }
+  };
+
+  const handleUpdateProfile = async (updatedData: Partial<UserData>) => {
+    try {
+      const response = await fetch('/api/account', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUserId,
+          ...updatedData
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to update profile');
+      
+      const result = await response.json();
+      if (result.success) {
+        await fetchUserData(); // Refresh user data
+        // Hiển thị thông báo thành công
+        setNotification({
+          type: 'success',
+          message: 'Cập nhật thông tin thành công!'
+        });
+      }
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      setNotification({
+        type: 'error',
+        message: 'Không thể cập nhật thông tin'
+      });
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: number) => {
+    if (!confirm('Bạn có chắc chắn muốn xóa đánh giá này?')) return;
+
+    try {
+      const response = await fetch(`/api/account/reviews?reviewId=${reviewId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) throw new Error('Failed to delete review');
+      
+      // Refresh reviews
+      fetchReviews();
+      fetchUserData(); // Update review count
+    } catch (err) {
+      console.error('Error deleting review:', err);
+      alert('Không thể xóa đánh giá');
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('vi-VN');
+  };
+
+   if (loading || !currentUserId) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span>Đang tải...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !userData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error || 'Không thể tải dữ liệu'}</p>
+          <button 
+            onClick={fetchUserData}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          >
+            Thử lại
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -150,6 +489,7 @@ const AccountPage = () => {
                 </div>
                 <div className="pt-20">
                   <h1 className="text-2xl font-bold text-gray-800">{userData.name}</h1>
+                  <p className="text-gray-500 mt-1">@{userData.username}</p>
                   <p className="text-gray-500 mt-1">{userData.email}</p>
                   <div className="flex items-center mt-2 text-sm text-gray-500">
                     <Clock className="w-4 h-4 mr-1.5" />
@@ -163,7 +503,7 @@ const AccountPage = () => {
                     </div>
                     <div className="text-center p-4 bg-gray-50 rounded-lg">
                       <div className="font-bold text-xl text-gray-800">{userData.completedTrips}</div>
-                      <div className="text-sm text-gray-500 mt-1">Chuyến đi đã hoàn thành</div>
+                      <div className="text-sm text-gray-500 mt-1">Chuyến đi hoàn thành</div>
                     </div>
                     <div className="text-center p-4 bg-gray-50 rounded-lg">
                       <div className="font-bold text-xl text-gray-800">{userData.reviewsCount}</div>
@@ -174,6 +514,7 @@ const AccountPage = () => {
               </div>
             </div>
             
+            {/* Personal Information */}
             <div className="bg-white rounded-xl shadow-sm overflow-hidden p-6">
               <h2 className="text-xl font-bold text-gray-800 mb-4">Thông tin cá nhân</h2>
               
@@ -183,10 +524,14 @@ const AccountPage = () => {
                     <div className="text-sm text-gray-500">Họ và tên</div>
                     <div className="font-medium mt-1">{userData.name}</div>
                   </div>
-                  <button className="mt-2 md:mt-0 inline-flex items-center text-blue-600 hover:text-blue-700">
-                    <Edit className="w-4 h-4 mr-1" />
-                    <span>Chỉnh sửa</span>
-                  </button>
+                <button 
+                  onClick={() => openEditModal('name', 'Chỉnh sửa họ và tên', userData.name)}
+                  className="mt-2 md:mt-0 inline-flex items-center text-blue-600 hover:text-blue-700 transition-colors"
+                >
+                  <Edit className="w-4 h-4 mr-1" />
+                  <span>Chỉnh sửa</span>
+                </button>
+
                 </div>
                 
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between py-3 border-b border-gray-200">
@@ -194,7 +539,10 @@ const AccountPage = () => {
                     <div className="text-sm text-gray-500">Email</div>
                     <div className="font-medium mt-1">{userData.email}</div>
                   </div>
-                  <button className="mt-2 md:mt-0 inline-flex items-center text-blue-600 hover:text-blue-700">
+                  <button 
+                    onClick={() => openEditModal('email', 'Chỉnh sửa địa chỉ email', userData.email)}
+                    className="mt-2 md:mt-0 inline-flex items-center text-blue-600 hover:text-blue-700 transition-colors"
+                  >
                     <Edit className="w-4 h-4 mr-1" />
                     <span>Chỉnh sửa</span>
                   </button>
@@ -202,13 +550,17 @@ const AccountPage = () => {
                 
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between py-3 border-b border-gray-200">
                   <div>
-                    <div className="text-sm text-gray-500">Số điện thoại</div>
-                    <div className="font-medium mt-1">+84 90 123 4567</div>
+                    <div className="text-sm text-gray-500">Tên người dùng</div>
+                    <div className="font-medium mt-1">@{userData.username}</div>
                   </div>
-                  <button className="mt-2 md:mt-0 inline-flex items-center text-blue-600 hover:text-blue-700">
+                 <button 
+                    onClick={() => openEditModal('username', 'Chỉnh sửa tên người dùng', userData.username)}
+                    className="mt-2 md:mt-0 inline-flex items-center text-blue-600 hover:text-blue-700 transition-colors"
+                  >
                     <Edit className="w-4 h-4 mr-1" />
                     <span>Chỉnh sửa</span>
                   </button>
+
                 </div>
                 
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between py-3">
@@ -224,32 +576,33 @@ const AccountPage = () => {
               </div>
             </div>
             
+            {/* Achievements */}
             <div className="bg-white rounded-xl shadow-sm overflow-hidden p-6">
               <h2 className="text-xl font-bold text-gray-800 mb-4">Thành tựu</h2>
               
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center">
-                  <div className="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
-                    <Award className="w-8 h-8 text-blue-600" />
+                  <div className={`w-16 h-16 mx-auto ${userData.savedPlaces >= 20 ? 'bg-blue-100' : 'bg-gray-100'} rounded-full flex items-center justify-center ${userData.savedPlaces < 20 ? 'opacity-50' : ''}`}>
+                    <Award className={`w-8 h-8 ${userData.savedPlaces >= 20 ? 'text-blue-600' : 'text-gray-400'}`} />
                   </div>
-                  <h3 className="font-medium mt-2">Nhà khám phá</h3>
-                  <p className="text-xs text-gray-500 mt-1">Đã khám phá 20+ địa điểm</p>
+                  <h3 className={`font-medium mt-2 ${userData.savedPlaces < 20 ? 'text-gray-500' : ''}`}>Nhà khám phá</h3>
+                  <p className="text-xs text-gray-500 mt-1">Đã khám phá {userData.savedPlaces}/20+ địa điểm</p>
                 </div>
                 
                 <div className="text-center">
-                  <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center opacity-50">
-                    <Star className="w-8 h-8 text-gray-400" />
+                  <div className={`w-16 h-16 mx-auto ${userData.reviewsCount >= 50 ? 'bg-yellow-100' : 'bg-gray-100'} rounded-full flex items-center justify-center ${userData.reviewsCount < 50 ? 'opacity-50' : ''}`}>
+                    <Star className={`w-8 h-8 ${userData.reviewsCount >= 50 ? 'text-yellow-600' : 'text-gray-400'}`} />
                   </div>
-                  <h3 className="font-medium mt-2 text-gray-500">Chuyên gia đánh giá</h3>
-                  <p className="text-xs text-gray-500 mt-1">Đánh giá 50+ địa điểm</p>
+                  <h3 className={`font-medium mt-2 ${userData.reviewsCount < 50 ? 'text-gray-500' : ''}`}>Chuyên gia đánh giá</h3>
+                  <p className="text-xs text-gray-500 mt-1">Đánh giá {userData.reviewsCount}/50+ địa điểm</p>
                 </div>
                 
                 <div className="text-center">
-                  <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
-                    <Compass className="w-8 h-8 text-green-600" />
+                  <div className={`w-16 h-16 mx-auto ${userData.completedTrips >= 5 ? 'bg-green-100' : 'bg-gray-100'} rounded-full flex items-center justify-center ${userData.completedTrips < 5 ? 'opacity-50' : ''}`}>
+                    <Compass className={`w-8 h-8 ${userData.completedTrips >= 5 ? 'text-green-600' : 'text-gray-400'}`} />
                   </div>
-                  <h3 className="font-medium mt-2">Lữ khách</h3>
-                  <p className="text-xs text-gray-500 mt-1">Hoàn thành 5+ chuyến đi</p>
+                  <h3 className={`font-medium mt-2 ${userData.completedTrips < 5 ? 'text-gray-500' : ''}`}>Lữ khách</h3>
+                  <p className="text-xs text-gray-500 mt-1">Hoàn thành {userData.completedTrips}/5+ chuyến đi</p>
                 </div>
                 
                 <div className="text-center">
@@ -270,17 +623,17 @@ const AccountPage = () => {
             <div className="bg-white rounded-xl shadow-sm overflow-hidden p-6 mb-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-800">Địa điểm đã lưu</h2>
-                <div className="relative">
-                  <select className="appearance-none bg-gray-50 border border-gray-200 text-gray-700 py-2 px-4 pr-8 rounded-lg focus:outline-none focus:bg-white focus:border-gray-500">
-                    <option>Tất cả</option>
-                    <option>Nhà hàng</option>
-                    <option>Khách sạn</option>
-                    <option>Địa điểm du lịch</option>
-                    <option>Quán cà phê</option>
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  </div>
-                </div>
+                <select 
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="appearance-none bg-gray-50 border border-gray-200 text-gray-700 py-2 px-4 pr-8 rounded-lg focus:outline-none focus:bg-white focus:border-gray-500"
+                >
+                  <option value="Tất cả">Tất cả</option>
+                  <option value="restaurant">Nhà hàng</option>
+                  <option value="hotel">Khách sạn</option>
+                  <option value="tourist_attraction">Địa điểm du lịch</option>
+                  <option value="cafe">Quán cà phê</option>
+                </select>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -321,16 +674,32 @@ const AccountPage = () => {
                         </div>
                         <span className="ml-1 text-sm text-gray-600">{place.rating}</span>
                       </div>
+                      <div className="mt-2 text-xs text-gray-400">
+                        Đã lưu: {formatDate(place.savedAt)}
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
               
-              <div className="mt-6 text-center">
-                <button className="bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-50">
-                  Xem thêm
-                </button>
-              </div>
+              {savedPlaces.length === 0 && (
+                <div className="text-center py-8">
+                  <Heart className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-500 mb-2">Chưa có địa điểm nào được lưu</h3>
+                  <p className="text-gray-400">Hãy khám phá và lưu những địa điểm yêu thích của bạn!</p>
+                </div>
+              )}
+              
+              {savedPlaces.length > 0 && (
+                <div className="mt-6 text-center">
+                  <button 
+                    onClick={() => setSavedPlacesPage(prev => prev + 1)}
+                    className="bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-50"
+                  >
+                    Xem thêm
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -341,9 +710,11 @@ const AccountPage = () => {
             <div className="bg-white rounded-xl shadow-sm overflow-hidden p-6 mb-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-800">Chuyến đi của tôi</h2>
-                <button className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700">
-                  + Tạo chuyến đi mới
-                </button>
+                <Link href="/dashboard/trips/create">
+                  <button className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700">
+                    + Tạo chuyến đi mới
+                  </button>
+                </Link>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -357,33 +728,53 @@ const AccountPage = () => {
                         className="object-cover"
                       />
                       <div className={`absolute top-3 right-3 text-xs font-medium py-1 px-2 rounded-full ${
-                        trip.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                        trip.status === 'completed' ? 'bg-green-100 text-green-800' : 
+                        trip.status === 'planned' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-800'
                       }`}>
-                        {trip.status === 'completed' ? 'Đã hoàn thành' : 'Đã lên kế hoạch'}
+                        {trip.status === 'completed' ? 'Đã hoàn thành' : 
+                         trip.status === 'planned' ? 'Đã lên kế hoạch' : 'Nháp'}
                       </div>
                     </div>
                     <div className="p-4">
                       <h3 className="font-bold text-gray-800">{trip.name}</h3>
                       <div className="flex items-center mt-2 text-sm text-gray-500">
                         <Calendar className="w-4 h-4 mr-1" />
-                        <span>{trip.startDate} - {trip.endDate}</span>
+                        <span>{formatDate(trip.startDate)} - {formatDate(trip.endDate)}</span>
                       </div>
                       <div className="flex items-center mt-2 text-sm text-gray-500">
                         <MapPin className="w-4 h-4 mr-1" />
                         <span>{trip.placesCount} địa điểm</span>
                       </div>
                       <div className="mt-4 flex justify-between">
-                        <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                          Xem chi tiết
-                        </button>
-                        <button className="text-gray-500 hover:text-gray-700">
-                          <Edit className="w-4 h-4" />
-                        </button>
+                        <Link href={`/dashboard/trips/${trip.id}`}>
+                          <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                            Xem chi tiết
+                          </button>
+                        </Link>
+                        <Link href={`/dashboard/trips/${trip.id}/edit`}>
+                          <button className="text-gray-500 hover:text-gray-700">
+                            <Edit className="w-4 h-4" />
+                          </button>
+                        </Link>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
+
+              {trips.length === 0 && (
+                <div className="text-center py-8">
+                  <Map className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-500 mb-2">Chưa có chuyến đi nào</h3>
+                  <p className="text-gray-400 mb-4">Hãy tạo chuyến đi đầu tiên của bạn!</p>
+                  <Link href="/dashboard/trips/create">
+                    <button className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700">
+                      Tạo chuyến đi mới
+                    </button>
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -403,7 +794,7 @@ const AccountPage = () => {
                         <div className="text-sm text-blue-600 mt-1">{review.placeType}</div>
                       </div>
                       <div className="text-sm text-gray-500">
-                        {review.date}
+                        {formatDate(review.date)}
                       </div>
                     </div>
                     
@@ -433,7 +824,10 @@ const AccountPage = () => {
                         <Edit className="w-4 h-4 mr-1" />
                         <span>Chỉnh sửa</span>
                       </button>
-                      <button className="ml-4 inline-flex items-center text-gray-500 hover:text-gray-700">
+                      <button 
+                        onClick={() => handleDeleteReview(review.id)}
+                        className="ml-4 inline-flex items-center text-red-500 hover:text-red-700"
+                      >
                         <Trash className="w-4 h-4 mr-1" />
                         <span>Xóa</span>
                       </button>
@@ -441,6 +835,25 @@ const AccountPage = () => {
                   </div>
                 ))}
               </div>
+
+              {reviews.length === 0 && (
+                <div className="text-center py-8">
+                  <Star className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-500 mb-2">Chưa có đánh giá nào</h3>
+                  <p className="text-gray-400">Hãy chia sẻ trải nghiệm của bạn về những địa điểm đã ghé thăm!</p>
+                </div>
+              )}
+
+              {reviews.length > 0 && (
+                <div className="mt-6 text-center">
+                  <button 
+                    onClick={() => setReviewsPage(prev => prev + 1)}
+                    className="bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-50"
+                  >
+                    Xem thêm
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -610,6 +1023,9 @@ const AccountPage = () => {
                     >
                       <Heart className="w-5 h-5 mr-3" />
                       Địa điểm đã lưu
+                      <span className="ml-auto bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded-full">
+                        {userData.savedPlaces}
+                      </span>
                     </button>
                   </li>
                   <li>
@@ -623,6 +1039,9 @@ const AccountPage = () => {
                     >
                       <Map className="w-5 h-5 mr-3" />
                       Chuyến đi của tôi
+                      <span className="ml-auto bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded-full">
+                        {trips.length}
+                      </span>
                     </button>
                   </li>
                   <li>
@@ -636,6 +1055,9 @@ const AccountPage = () => {
                     >
                       <Star className="w-5 h-5 mr-3" />
                       Đánh giá của tôi
+                      <span className="ml-auto bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded-full">
+                        {userData.reviewsCount}
+                      </span>
                     </button>
                   </li>
                   <li>
@@ -669,6 +1091,26 @@ const AccountPage = () => {
           </div>
         </div>
       </div>
+      {/* Edit Modal */}
+
+      <EditModal
+        isOpen={editModal.isOpen}
+        onClose={() => setEditModal({ ...editModal, isOpen: false })}
+        title={editModal.title}
+        currentValue={editModal.currentValue}
+        onSave={handleSaveFromModal}
+        type={editModal.type === 'email' ? 'email' : 'text'}
+        placeholder={
+          editModal.type === 'email' ? 'Nhập địa chỉ email mới' :
+          editModal.type === 'username' ? 'Nhập tên người dùng mới' :
+          'Nhập tên mới'
+        }
+      />
+      {/* Notification */}
+      <Notification
+        notification={notification}
+        onClose={() => setNotification(null)}
+      />
     </div>
   );
 };
