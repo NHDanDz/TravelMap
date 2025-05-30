@@ -12,28 +12,9 @@ import {
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { TripService } from '@/services/tripService';
+import {  Day, Place, City } from '@/types/trip';
 
-// Type definitions
-interface Place {
-  id: string;
-  name: string;
-  type: string;
-  address: string;
-  latitude: string;
-  longitude: string;
-  image: string;
-  duration?: number; // thời gian dự kiến ở địa điểm (phút)
-  notes?: string;
-  openingHours?: string;
-  startTime?: string;
-  endTime?: string;
-}
-
-interface Day {
-  dayNumber: number;
-  date: string;
-  places: Place[];
-}
+ 
 
 interface Trip {
   id: string;
@@ -46,6 +27,7 @@ interface Trip {
   days: Day[];
   status: 'draft' | 'planned' | 'completed';
   description?: string;
+  city?: City
 }
 
 // Dummy place data (to simulate saved places)
@@ -172,7 +154,16 @@ const sampleTrip: Trip = {
       date: '2025-04-23',
       places: [savedPlaces[5]]
     }
-  ]
+  ],
+  city: {
+    id: 1,
+    name: 'Hà Nội',
+    country: 'Việt Nam',
+    description: 'Thủ đô của Việt Nam, nổi tiếng với lịch sử lâu đời và văn hóa phong phú.',
+    imageUrl: '/images/ha-noi.jpg',
+    latitude: 21.0285,
+    longitude: 105.8542 
+  }
 };
 
 // Format date function
@@ -482,7 +473,7 @@ const handleSaveItinerary = async () => {
           <div className="md:flex">
             <div className="md:flex-shrink-0 relative h-48 md:h-auto md:w-1/3">
               <Image
-                src={trip.coverImage}
+                src={trip.city?.imageUrl || trip.coverImage || '/images/default-trip.jpg'}
                 alt={trip.name}
                 fill
                 className="object-cover"

@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 // Helper function để parse time string
-// Helper function để parse time string
 function parseTimeString(timeStr: string, dayDate: string): string | null {
   if (!timeStr) return null;
 
@@ -50,6 +49,41 @@ function parseTimeString(timeStr: string, dayDate: string): string | null {
   }
 
   return `${normalizedDate}T${time}+07:00`;
+}
+
+// Helper function để tìm hoặc tạo city
+async function findOrCreateCity(destination: string, tx: any) {
+  // Tìm city theo tên (không phân biệt hoa thường)
+  let city = await tx.city.findFirst({
+    where: {
+      name: {
+        equals: destination,
+        mode: 'insensitive'
+      }
+    }
+  });
+
+  // Nếu không tìm thấy, tạo city mới
+  if (!city) {
+    // Tách destination thành city và country nếu có format "City, Country"
+    const parts = destination.split(',').map(part => part.trim());
+    const cityName = parts[0];
+    const country = parts.length > 1 ? parts[1] : 'Vietnam'; // Default country
+
+    city = await tx.city.create({
+      data: {
+        name: cityName,
+        country: country,
+        description: `Auto-created city for ${destination}`,
+        // Có thể thêm logic để lấy tọa độ từ geocoding API
+        latitude: null,
+        longitude: null,
+        imageUrl: null
+      }
+    });
+  }
+
+  return city;
 }
 
 // GET - Lấy danh sách trips
@@ -116,10 +150,11 @@ export async function GET(request: NextRequest) {
       placesCount: trip.days.reduce((total, day) => total + day.itineraryItems.length, 0),
       status: trip.status as 'draft' | 'planned' | 'completed',
       description: trip.description,
-      createdBy: 'manual' as const, // Có thể thêm field này vào DB sau
+      createdBy: 'manual' as const,
       tags: trip.tags.map(tripTag => tripTag.tag.name),
-      estimatedBudget: undefined, // Có thể tính từ expenses
-      travelCompanions: 1 // Có thể thêm field này vào DB
+      estimatedBudget: undefined,
+      travelCompanions: 1,
+      city: trip.city
     }));
 
     return NextResponse.json(transformedTrips);
@@ -129,11 +164,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Tạo trip mới
+// POST - Tạo trip mới với city management
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log(request.json());
     const {
       name,
       destination,
@@ -151,6 +185,10 @@ export async function POST(request: NextRequest) {
 
     // Tạo trip với transaction
     const result = await prisma.$transaction(async (tx) => {
+      // Tìm hoặc tạo city dựa trên destination
+      const city = await findOrCreateCity(destination, tx);
+      const finalCityId = city.id;
+
       // Tạo trip
       const trip = await tx.trip.create({
         data: {
@@ -161,7 +199,11 @@ export async function POST(request: NextRequest) {
           description,
           userId: parseInt(userId),
           status,
+          cityId: finalCityId,
           coverImageUrl: '/images/default-trip.jpg'
+        },
+        include: {
+          city: true // Include city trong response
         }
       });
 
@@ -198,6 +240,7 @@ export async function POST(request: NextRequest) {
                     address: placeData.address,
                     latitude: parseFloat(placeData.latitude),
                     longitude: parseFloat(placeData.longitude),
+                    cityId: finalCityId, // Link place to the city
                     imageUrl: placeData.image,
                     openingHours: placeData.openingHours,
                     avgDurationMinutes: placeData.duration,
@@ -238,6 +281,8 @@ export async function POST(request: NextRequest) {
         status: result.status,
         description: result.description,
         coverImageUrl: result.coverImageUrl,
+        cityId: result.cityId,
+        city: result.city,
         createdAt: result.createdAt,
         updatedAt: result.updatedAt
       }

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { TripService } from '@/services/tripService';
 import { AuthService } from '@/lib/auth';
+import { Trip, Day, Place, CreateTripRequest } from '@/types/trip';
 
 // Service imports
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8089';
@@ -62,47 +63,7 @@ const EXPECTED_RESPONSE_FORMAT = {
     }
   ]
 };
-
-// Type definitions  
-interface Trip {
-  id: string;
-  name: string;
-  destination: string;
-  startDate: string;
-  endDate: string;
-  coverImage: string;
-  numDays: number;
-  placesCount: number;
-  status: 'draft' | 'planned' | 'completed';
-  description?: string;
-  createdBy?: 'manual' | 'ai';
-  tags?: string[];
-  estimatedBudget?: number;
-  travelCompanions?: number;
-}
-
-interface Place {
-  id: string;
-  name: string;
-  type: string;
-  address: string;
-  latitude: string;
-  longitude: string;
-  image: string;
-  startTime?: string;
-  endTime?: string;
-  duration?: number;
-  rating?: number;
-  notes?: string;
-  openingHours?: string;
-}
-
-interface Day {
-  dayNumber: number;
-  date: string;
-  places: Place[];
-}
-
+  
 interface TripRequest {
   destination: string;
   startDate: string;
@@ -730,6 +691,7 @@ useEffect(() => {
         throw new Error('User not authenticated');
       }      
       const tripsData = await TripService.getTrips({ userId });
+      console.error(tripsData)
       setTrips(tripsData);
     } catch (error) {
       console.error('Error loading trips:', error);
@@ -877,7 +839,7 @@ const handleCreateTrip = async (e: React.FormEvent) => {
         travelers: parseInt(newTrip.travelCompanions),
         language: 'vi'
       };
-
+        
       // Generate AI itinerary
       const aiResponse = await TravelAIService.generateItinerary(tripRequest);
       console.log('AI response:', aiResponse);
@@ -1078,10 +1040,11 @@ const handleCreateTrip = async (e: React.FormEvent) => {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredTrips.map(trip => (
               <div key={trip.id} className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow group">
+                
                 <div className="relative">
                   <div className="relative h-48 w-full">
-                    <Image
-                      src={trip.coverImage}
+                     <Image
+                      src={trip.city?.imageUrl ?? "/images/default-city.jpg"}
                       alt={trip.name}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-300"
@@ -1479,7 +1442,7 @@ const handleCreateTrip = async (e: React.FormEvent) => {
       <div className="fixed bottom-0 inset-x-0 bg-white border-t shadow-lg z-10 lg:hidden">
         <div className="grid grid-cols-4 h-16">
           <Link
-            href="/dashboard"
+            href="/"
             className="flex flex-col items-center justify-center text-gray-500"
           >
             <Compass className="h-6 w-6" />

@@ -78,10 +78,10 @@ export async function GET(request: NextRequest, { params }: Params) {
         }))
       })),
       tags: trip.tags.map(tripTag => tripTag.tag.name),
-      user: trip.user
+      user: trip.user,
+      city: trip.city
     };
-
-    return NextResponse.json(transformedTrip);
+     return NextResponse.json(transformedTrip);
   } catch (error) {
     console.error('Error fetching trip:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

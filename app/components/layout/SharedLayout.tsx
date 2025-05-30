@@ -63,7 +63,7 @@ export const Navbar = () => {
         
         <nav className="hidden md:flex items-center space-x-8">
           <Link 
-            href="/dashboard" 
+            href="/" 
             className={`font-medium hover:text-blue-500 transition-colors text-gray-700`}
           >
             Trang chủ
@@ -133,7 +133,7 @@ export const Navbar = () => {
       {showMobileMenu && (
         <div className="md:hidden bg-white border-t border-gray-100 px-4 py-3 space-y-3 absolute w-full z-10 shadow-md">
           <Link 
-            href="/dashboard" 
+            href="/" 
             className="block py-2 text-gray-600 hover:text-gray-900"
             onClick={() => setShowMobileMenu(false)}
           >

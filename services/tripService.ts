@@ -1,57 +1,18 @@
 // lib/services/tripService.ts
-
-export interface Trip {
-  id: string;
-  name: string;
-  destination: string;
-  startDate: string;
-  endDate: string;
-  coverImage: string;
-  numDays: number;
-  placesCount: number;
-  status: 'draft' | 'planned' | 'completed';
-  description?: string;
-  createdBy?: 'manual' | 'ai';
-  tags?: string[];
-  estimatedBudget?: number;
-  travelCompanions?: number;
-}
-
-export interface Place {
-  id: string;
-  name: string;
-  type: string;
-  address: string;
-  latitude: string;
-  longitude: string;
-  image: string;
-  startTime?: string;
-  endTime?: string;
-  duration?: number;
-  rating?: number;
-  notes?: string;
-  openingHours?: string;
-}
-
-export interface Day {
-  dayNumber: number;
-  date: string;
-  places: Place[];
-}
-
-export interface TripDetail extends Trip {
-  days: Day[];
-}
+import { 
+  Trip, 
+  TripDetail, 
+  Day, 
+  CreateTripRequest, 
+  CreateTripResponse, 
+  GetTripsParams 
+} from '@/types/trip';
 
 export class TripService {
   private static baseUrl = '/api/trips';
 
   // Lấy danh sách trips
-  static async getTrips(params?: {
-    userId?: string;
-    status?: string;
-    search?: string;
-  }): Promise<Trip[]> {
+  static async getTrips(params?: GetTripsParams): Promise<Trip[]> {
     try {
       const searchParams = new URLSearchParams();
       
@@ -60,12 +21,17 @@ export class TripService {
       if (params?.search) searchParams.append('search', params.search);
 
       const response = await fetch(`${this.baseUrl}?${searchParams.toString()}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      return await response.json();
+
+      // console.error('Response status:', response.status);
+      // console.error('Response headers:', [...response.headers.entries()]);
+
+      const responseBody = await response.text();
+      // console.error('Raw response body:', responseBody);
+
+      // Sau đó bạn có thể parse nó thành JSON nếu chắc chắn đó là JSON
+      const data = JSON.parse(responseBody);
+      return data;
+
     } catch (error) {
       console.error('Error fetching trips:', error);
       throw error;
@@ -92,16 +58,7 @@ export class TripService {
   }
 
   // Tạo trip mới
-  static async createTrip(tripData: {
-    name: string;
-    destination: string;
-    startDate: string;
-    endDate: string;
-    description?: string;
-    userId: string;
-    status?: string;
-    days?: Day[];
-  }): Promise<{ id: string; trip?: any }> {
+  static async createTrip(tripData: CreateTripRequest): Promise<CreateTripResponse> {
     try {
       const response = await fetch(this.baseUrl, {
         method: 'POST',

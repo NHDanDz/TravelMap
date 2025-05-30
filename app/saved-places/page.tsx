@@ -500,7 +500,7 @@ const SavedPlacesPage = () => {
       <div className="fixed bottom-0 inset-x-0 bg-white border-t shadow-lg z-10 lg:hidden">
         <div className="grid grid-cols-4 h-16">
           <Link
-            href="/dashboard"
+            href="/"
             className="flex flex-col items-center justify-center text-gray-500"
           >
             <Compass className="h-6 w-6" />

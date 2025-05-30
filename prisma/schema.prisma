@@ -1,3 +1,4 @@
+// prisma/schema.prisma - Updated version
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,6 +15,8 @@ model User {
   passwordHash      String             @map("password_hash") @db.VarChar(255)
   fullName          String?            @map("full_name") @db.VarChar(100)
   avatarUrl         String?            @map("avatar_url")
+  isActive          Boolean?           @default(true) @map("is_active")
+  lastLoginAt       DateTime?          @map("last_login_at") @db.Timestamptz(6)
   createdAt         DateTime?          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime?          @default(now()) @map("updated_at") @db.Timestamptz(6)
   placePhotos       PlacePhoto[]
@@ -99,19 +102,22 @@ model PlacePhoto {
 }
 
 model Review {
-  id        Int       @id @default(autoincrement())
-  userId    Int?      @map("user_id")
-  placeId   Int?      @map("place_id")
-  rating    Int
-  comment   String?
-  visitDate DateTime? @map("visit_date") @db.Date
-  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
-  place     Place?    @relation(fields: [placeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  user      User?     @relation(fields: [userId], references: [id], onUpdate: NoAction)
+  id             Int       @id @default(autoincrement())
+  userId         Int?      @map("user_id")
+  placeId        Int?      @map("place_id")
+  rating         Int
+  comment        String?
+  visitDate      DateTime? @map("visit_date") @db.Date
+  status         String?   @default("approved") @db.VarChar(20)
+  moderatorNote  String?   @map("moderator_note")
+  createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+  place          Place?    @relation(fields: [placeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user           User?     @relation(fields: [userId], references: [id], onUpdate: NoAction)
 
   @@index([placeId], map: "idx_reviews_place")
   @@index([userId], map: "idx_reviews_user")
+  @@index([status], map: "idx_reviews_status")
   @@map("reviews")
 }
 
@@ -260,6 +266,8 @@ model WeatherData {
   temperatureLow      Decimal?  @map("temperature_low") @db.Decimal(5, 2)
   condition           String?   @db.VarChar(50)
   precipitationChance Decimal?  @map("precipitation_chance") @db.Decimal(5, 2)
+  humidity            Decimal?  @db.Decimal(5, 2)
+  windSpeed           Decimal?  @map("wind_speed") @db.Decimal(5, 2)
   createdAt           DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
   city                City?     @relation(fields: [cityId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
@@ -276,4 +284,13 @@ model NearbyPlace {
 
   @@id([placeId, nearbyPlaceId])
   @@map("nearby_places")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model spatial_ref_sys {
+  srid      Int     @id
+  auth_name String? @db.VarChar(256)
+  auth_srid Int?
+  srtext    String? @db.VarChar(2048)
+  proj4text String? @db.VarChar(2048)
 }
