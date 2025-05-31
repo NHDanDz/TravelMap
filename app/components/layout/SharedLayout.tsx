@@ -96,6 +96,12 @@ export const Navbar = () => {
             Lịch trình
           </Link>
           <Link 
+            href="/chat" 
+            className={`font-medium hover:text-blue-500 transition-colors text-gray-700`}
+          >
+            TravelBot
+          </Link>
+          <Link 
             href="/about" 
             className={`font-medium hover:text-blue-500 transition-colors text-gray-700`}
           >

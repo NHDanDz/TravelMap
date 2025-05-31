@@ -13,6 +13,7 @@ import {
 import { TripService } from '@/services/tripService';
 import { AuthService } from '@/lib/auth';
 import { Trip, Day, Place, CreateTripRequest } from '@/types/trip';
+import SharedLayout from '@/app/components/layout/SharedLayout';
 
 // Service imports
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8089';
@@ -691,8 +692,7 @@ useEffect(() => {
         throw new Error('User not authenticated');
       }      
       const tripsData = await TripService.getTrips({ userId });
-      console.error(tripsData)
-      setTrips(tripsData);
+       setTrips(tripsData);
     } catch (error) {
       console.error('Error loading trips:', error);
       setTrips(sampleTrips); // Fallback về sample data
@@ -915,15 +915,13 @@ const handleCreateTrip = async (e: React.FormEvent) => {
   };
   
   return (
+      <SharedLayout>
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center">
-              <Link href="/dashboard" className="mr-6">
-                <Compass className="h-6 w-6 text-blue-600" />
-              </Link>
+            <div className="flex items-center"> 
               <div>
                 <h1 className="text-2xl font-bold text-gray-800">Lịch trình du lịch</h1>
                 <p className="text-sm text-gray-600 mt-1">Quản lý và lên kế hoạch cho chuyến đi của bạn</p>
@@ -1438,39 +1436,9 @@ const handleCreateTrip = async (e: React.FormEvent) => {
         </div>
       )}
       
-      {/* Mobile bottom navigation */}
-      <div className="fixed bottom-0 inset-x-0 bg-white border-t shadow-lg z-10 lg:hidden">
-        <div className="grid grid-cols-4 h-16">
-          <Link
-            href="/"
-            className="flex flex-col items-center justify-center text-gray-500"
-          >
-            <Compass className="h-6 w-6" />
-            <span className="text-xs mt-1">Trang chủ</span>
-          </Link>
-          <Link
-            href="/dashboard/Map"
-            className="flex flex-col items-center justify-center text-gray-500"
-          >
-            <Map className="h-6 w-6" />
-            <span className="text-xs mt-1">Bản đồ</span>
-          </Link>
-          <Link
-            href="/saved-places"
-            className="flex flex-col items-center justify-center text-gray-500"
-          >
-            <Heart className="h-6 w-6" />
-            <span className="text-xs mt-1">Đã lưu</span>
-          </Link>
-          <Link
-            href="/account"
-            className="flex flex-col items-center justify-center text-gray-500"
-          >
-            <User className="h-6 w-6" />
-            <span className="text-xs mt-1">Tài khoản</span>
-          </Link>
-        </div>
-      </div>
+      
     </div>
+    </SharedLayout>
+
   );
 }

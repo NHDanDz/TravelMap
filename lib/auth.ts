@@ -6,26 +6,36 @@ export interface User {
 }
 
 export class AuthService {
-  // Key để lưu user trong localStorage
+  // Key để lưu user trong storage
   private static readonly USER_STORAGE_KEY = 'user';
 
-  // Lấy current user từ localStorage
+  // Lấy current user từ localStorage hoặc sessionStorage
   static getCurrentUser(): User | null {
     try {
-      const userData = localStorage.getItem(this.USER_STORAGE_KEY);
+      // ✅ Check localStorage first (persistent login)
+      let userData = localStorage.getItem(this.USER_STORAGE_KEY);
+      
+      // ✅ If not found, check sessionStorage (session-only login)
+      if (!userData) {
+        userData = sessionStorage.getItem(this.USER_STORAGE_KEY);
+      }
+      
       if (!userData) {
         return null;
       }
+      
       const user: User = JSON.parse(userData);
+      
       // Kiểm tra định dạng user
       if (!user.id || !user.username || !user.email) {
-        console.warn('Invalid user data in localStorage');
+        console.warn('Invalid user data in storage');
         this.logout(); // Xóa dữ liệu không hợp lệ
         return null;
       }
+      
       return user;
     } catch (error) {
-      console.error('Error parsing user from localStorage:', error);
+      console.error('Error parsing user from storage:', error);
       this.logout(); // Xóa dữ liệu nếu lỗi
       return null;
     }
@@ -45,18 +55,24 @@ export class AuthService {
     return !!this.getCurrentUser();
   }
 
-  // Lưu user vào localStorage sau khi đăng nhập
-  static login(user: User): void {
+  // Lưu user vào storage sau khi đăng nhập
+  static login(user: User, rememberMe: boolean = false): void {
     try {
-      localStorage.setItem(this.USER_STORAGE_KEY, JSON.stringify(user));
+      const userJson = JSON.stringify(user);
+      if (rememberMe) {
+        localStorage.setItem(this.USER_STORAGE_KEY, userJson);
+      } else {
+        sessionStorage.setItem(this.USER_STORAGE_KEY, userJson);
+      }
     } catch (error) {
-      console.error('Error saving user to localStorage:', error);
+      console.error('Error saving user to storage:', error);
     }
   }
 
-  // Xóa user khỏi localStorage khi đăng xuất
+  // Xóa user khỏi cả localStorage và sessionStorage khi đăng xuất
   static logout(): void {
     localStorage.removeItem(this.USER_STORAGE_KEY);
+    sessionStorage.removeItem(this.USER_STORAGE_KEY);
   }
 
   // Tạo user mới (cho test hoặc đăng ký)
@@ -77,8 +93,8 @@ export class AuthService {
       fullName: userData.fullName,
     };
 
-    // Lưu user mới vào localStorage (giả lập đăng nhập)
-    this.login(newUser);
+    // Lưu user mới vào storage (giả lập đăng nhập)
+    this.login(newUser, false); // Default to session-only for new registrations
     return newUser;
   }
 }

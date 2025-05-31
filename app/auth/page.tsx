@@ -51,12 +51,9 @@ const AuthPage = () => {
           throw new Error(data.error || 'Đăng nhập thất bại');
         }
 
-        toast.success('Đăng nhập thành công!');
-        // Lưu thông tin user vào localStorage hoặc context nếu cần
-        if (formData.rememberMe) {
-          localStorage.setItem('user', JSON.stringify(data.user));
-        }
-        router.push('/dashboard'); // Chuyển hướng sau khi đăng nhập
+        toast.success('Đăng nhập thành công!'); 
+        localStorage.setItem('user', JSON.stringify(data.user)); 
+        router.push('/'); // Chuyển hướng sau khi đăng nhập
       } else {
         // Đăng ký
         const response = await fetch('/api/users', {
