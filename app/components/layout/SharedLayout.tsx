@@ -1,3 +1,4 @@
+// app/components/layout/SharedLayout.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -9,9 +10,10 @@ import {
   MapPin, Compass, ArrowRight, Search, Star, 
   Calendar, Users, Coffee, Hotel, Utensils, Landmark,
   ChevronRight, Globe, Shield, Download, CheckCircle, 
-  Menu, X, User, LogOut
+  Menu, X, User, LogOut, MessageCircle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { TravelChat } from '../chat/TravelChat';
 
 // Navbar component
 export const Navbar = () => {
@@ -43,9 +45,22 @@ export const Navbar = () => {
   }, []);
 
   const handleLogout = () => {
+    // Clear user sessions before logout
+    if (typeof window !== 'undefined') {
+      try {
+        // Import ChatService dynamically to avoid SSR issues
+        import('@/services/chatService').then(({ ChatService }) => {
+          ChatService.clearAllUserSessions();
+        }).catch(error => {
+          console.error('Error importing ChatService:', error);
+        });
+      } catch (error) {
+        console.error('Error clearing chat sessions on logout:', error);
+      }
+    }
+    
     localStorage.removeItem('user');
     setUser(null);
-    setShowMobileMenu(false);
     router.push('/auth');
   };
 
@@ -73,6 +88,12 @@ export const Navbar = () => {
             className={`font-medium hover:text-blue-500 transition-colors text-gray-700`}
           >
             Bản đồ
+          </Link>
+          <Link 
+            href="/trip-planner" 
+            className={`font-medium hover:text-blue-500 transition-colors text-gray-700`}
+          >
+            Lịch trình
           </Link>
           <Link 
             href="/about" 
@@ -147,6 +168,13 @@ export const Navbar = () => {
             Bản đồ
           </Link>
           <Link 
+            href="/trip-planner" 
+            className="block py-2 text-gray-600 hover:text-gray-900"
+            onClick={() => setShowMobileMenu(false)}
+          >
+            Lịch trình
+          </Link>
+          <Link 
             href="/about" 
             className="block py-2 text-gray-600 hover:text-gray-900"
             onClick={() => setShowMobileMenu(false)}
@@ -203,6 +231,7 @@ export const Navbar = () => {
     </header>
   );
 };
+
 // Footer component
 export const Footer = () => {
   return (
@@ -336,6 +365,7 @@ export const Footer = () => {
     </footer>
   );
 };
+
 // Mobile Bottom Navigation
 export const MobileNavigation = () => {
   const [user, setUser] = useState<{ username: string } | null>(null);
@@ -425,6 +455,9 @@ const SharedLayout: React.FC<SharedLayoutProps> = ({ children }) => {
       
       {/* Mobile Bottom Navigation - Only rendered client-side */}
       {isMounted && <MobileNavigation />}
+      
+      {/* Travel Chat Component - Available globally */}
+      {isMounted && <TravelChat />}
     </div>
   );
 };
