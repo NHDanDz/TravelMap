@@ -287,6 +287,16 @@ export default function TripMapComponent({
     }
   }, []);
 
+  // Calculate animation opacity - FIXED: Ensure opacity stays between 0 and 1
+  const getAnimatedOpacity = useCallback(() => {
+    if (!mapViewState.followRoute) return 0.8;
+    
+    // Use Math.abs and normalize to ensure value is between 0.3 and 1.0
+    const sineValue = Math.sin(routeAnimationIndex * 0.1);
+    const normalizedSine = (Math.abs(sineValue) + 1) / 2; // Convert [-1,1] to [0,1], then shift to [0.5,1]
+    return 0.3 + 0.5 * normalizedSine; // Result will be between 0.3 and 0.8
+  }, [mapViewState.followRoute, routeAnimationIndex]);
+
   // Get all places for current view
   const displayPlaces = getCurrentDayPlaces();
 
@@ -323,8 +333,7 @@ export default function TripMapComponent({
               paint={{
                 'line-color': route.properties.color,
                 'line-width': mapViewState.showAllDays ? 4 : 6,
-                'line-opacity': mapViewState.followRoute ? 
-                  0.3 + 0.7 * Math.sin(routeAnimationIndex * 0.1) : 0.8
+                'line-opacity': getAnimatedOpacity() // FIXED: Use safe opacity calculation
               }}
             />
           </Source>
@@ -395,7 +404,7 @@ export default function TripMapComponent({
         })}
 
         {/* Place Popup */}
-        {selectedPlace && showPopup && (
+       {selectedPlace && showPopup && (
           <Popup
             longitude={parseFloat(selectedPlace.longitude)}
             latitude={parseFloat(selectedPlace.latitude)}
@@ -405,16 +414,17 @@ export default function TripMapComponent({
             closeOnClick={false}
             offset={[0, -40]}
             className="z-50"
+            maxWidth="none" // Allow custom width control
           >
-            <div className="p-4 min-w-[300px] bg-white rounded-xl shadow-lg border border-gray-100">
+            <div className="p-3 w-72 max-w-[90vw] bg-white rounded-xl shadow-lg border border-gray-100 max-h-[80vh] overflow-y-auto">
               {/* Header */}
               <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <h3 className="font-bold text-gray-900 text-lg mb-1">{selectedPlace.name}</h3>
-                  <p className="text-sm text-gray-600 mb-2">{selectedPlace.address}</p>
+                <div className="flex-1 min-w-0 pr-2">
+                  <h3 className="font-bold text-gray-900 text-base mb-1 line-clamp-2">{selectedPlace.name}</h3>
+                  <p className="text-sm text-gray-600 mb-2 line-clamp-2">{selectedPlace.address}</p>
                   
                   {/* Metadata */}
-                  <div className="flex items-center space-x-3 text-xs text-gray-500">
+                  <div className="flex items-center space-x-3 text-xs text-gray-500 flex-wrap gap-1">
                     {selectedPlace.rating && (
                       <div className="flex items-center space-x-1">
                         <Star className="w-3 h-3 text-yellow-500 fill-current" />
@@ -433,7 +443,7 @@ export default function TripMapComponent({
                 
                 <button 
                   onClick={() => setShowPopup(false)}
-                  className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="p-1 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
                 >
                   ×
                 </button>
@@ -441,7 +451,7 @@ export default function TripMapComponent({
 
               {/* Image */}
               {selectedPlace.image && (
-                <div className="relative h-32 mb-3 rounded-lg overflow-hidden">
+                <div className="relative h-24 sm:h-32 mb-3 rounded-lg overflow-hidden">
                   <Image
                     src={selectedPlace.image}
                     alt={selectedPlace.name}
@@ -455,8 +465,8 @@ export default function TripMapComponent({
               {selectedPlace.duration && (
                 <div className="mb-3 p-2 bg-blue-50 rounded-lg">
                   <div className="flex items-center text-sm text-blue-800">
-                    <Clock className="w-4 h-4 mr-1" />
-                    <span>Thời gian dự kiến: {Math.floor(selectedPlace.duration / 60)}h {selectedPlace.duration % 60}m</span>
+                    <Clock className="w-4 h-4 mr-1 flex-shrink-0" />
+                    <span className="truncate">Thời gian dự kiến: {Math.floor(selectedPlace.duration / 60)}h {selectedPlace.duration % 60}m</span>
                   </div>
                 </div>
               )}
@@ -468,20 +478,20 @@ export default function TripMapComponent({
                     const url = `https://www.google.com/maps/dir/?api=1&destination=${selectedPlace.latitude},${selectedPlace.longitude}`;
                     window.open(url, '_blank');
                   }}
-                  className="flex-1 flex items-center justify-center space-x-2 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                  className="flex-1 flex items-center justify-center space-x-2 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors min-w-0"
                 >
-                  <Navigation className="w-4 h-4" />
-                  <span>Chỉ đường</span>
+                  <Navigation className="w-4 h-4 flex-shrink-0" />
+                  <span className="truncate">Chỉ đường</span>
                 </button>
                 <button 
-                  className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex-shrink-0"
                   title="Chụp ảnh màn hình"
                 >
                   <Camera className="w-4 h-4 text-gray-600" />
                 </button>
               </div>
             </div>
-          </Popup>
+          </Popup> 
         )}
       </MapGLWrapper>
 

@@ -326,9 +326,9 @@ export default function TripMapPage() {
   }
 
   return (
-    <div className={`${mapViewState.fullScreen ? 'fixed inset-0 z-50' : 'min-h-screen'} bg-gray-900 flex flex-col`}>
+    <div className={`${mapViewState.fullScreen ? 'fixed inset-0 z-50' : 'h-screen'} bg-gray-900 flex flex-col map-page-container`}>
       {/* Header */}
-      <header className="bg-white/95 backdrop-blur-sm border-b border-gray-200 relative z-10">
+      <header className="bg-white/95 backdrop-blur-sm border-b border-gray-200 relative z-10 flex-shrink-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -381,10 +381,10 @@ export default function TripMapPage() {
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 flex relative">
+      <div className="flex-1 flex relative min-h-0">
         {/* Timeline Panel */}
         {mapViewState.showTimeline && (
-          <div className="w-80 bg-white border-r border-gray-200 flex flex-col relative z-10">
+          <div className="w-80 bg-white border-r border-gray-200 flex flex-col relative z-10 timeline-panel">
             <TripTimelinePanel
               trip={trip}
               activeDay={mapViewState.activeDay}
@@ -396,7 +396,7 @@ export default function TripMapPage() {
         )}
 
         {/* Map Container */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative min-w-0">
           <TripMapComponent
             trip={trip}
             mapViewState={mapViewState}

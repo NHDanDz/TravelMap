@@ -192,7 +192,8 @@ export default function TripTimelinePanel({
   };
 
   // Toggle day expansion
-  const toggleDayExpansion = (dayNumber: number) => {
+  const toggleDayExpansion = (dayNumber: number, e: React.MouseEvent) => {
+    e.stopPropagation();
     setExpandedDay(expandedDay === dayNumber ? null : dayNumber);
   };
 
@@ -273,18 +274,19 @@ export default function TripTimelinePanel({
 
             return (
               <div key={day.dayNumber} className="space-y-2">
-                {/* Day Header */}
-                <button
-                  onClick={() => handleDaySelect(day.dayNumber)}
-                  className={`
-                    w-full flex items-center justify-between p-3 rounded-xl transition-all duration-200
-                    ${isActiveDay 
-                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg' 
-                      : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
-                    }
-                  `}
-                >
-                  <div className="flex items-center space-x-3">
+                {/* Day Header - FIXED: Restructured to avoid nested buttons */}
+                <div className={`
+                  w-full flex items-center justify-between p-3 rounded-xl transition-all duration-200 cursor-pointer
+                  ${isActiveDay 
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg' 
+                    : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
+                  }
+                `}>
+                  {/* Main clickable area for day selection */}
+                  <div 
+                    className="flex items-center space-x-3 flex-1 cursor-pointer"
+                    onClick={() => handleDaySelect(day.dayNumber)}
+                  >
                     <div className={`
                       w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm
                       ${isActiveDay ? 'bg-white/20 text-white' : `${dayColorClass} text-white`}
@@ -305,6 +307,7 @@ export default function TripTimelinePanel({
                     </div>
                   </div>
 
+                  {/* Separate area for controls */}
                   <div className="flex items-center space-x-2">
                     <span className={`
                       text-xs px-2 py-1 rounded-full font-medium
@@ -315,21 +318,19 @@ export default function TripTimelinePanel({
                     `}>
                       {day.places.length}
                     </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleDayExpansion(day.dayNumber);
-                      }}
-                      className={`p-1 rounded ${isActiveDay ? 'hover:bg-white/10' : 'hover:bg-gray-200'} transition-colors`}
+                    {/* Separate button for expansion - NOT nested */}
+                    <div
+                      onClick={(e) => toggleDayExpansion(day.dayNumber, e)}
+                      className={`p-1 rounded cursor-pointer ${isActiveDay ? 'hover:bg-white/10' : 'hover:bg-gray-200'} transition-colors`}
                     >
                       {isExpanded ? (
                         <ChevronUp className="w-4 h-4" />
                       ) : (
                         <ChevronDown className="w-4 h-4" />
                       )}
-                    </button>
+                    </div>
                   </div>
-                </button>
+                </div>
 
                 {/* Day Places - Show expanded or when active */}
                 {(isExpanded || isActiveDay) && day.places.length > 0 && (
