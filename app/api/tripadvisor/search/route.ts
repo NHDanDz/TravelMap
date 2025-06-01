@@ -131,48 +131,7 @@ export async function GET(request: Request) {
         }
       });
     } catch (tripadvisorError) {
-      // Xử lý lỗi từ TripAdvisor API
-      console.error('TripAdvisor API search error:', tripadvisorError);
-      
-      // Thử sử dụng dịch vụ mock làm dự phòng
-      try {
-        console.log('Falling back to mock service...');
-        
-        // Import dịch vụ mock một cách động
-        const { MockPlacesService } = await import('@/app/dashboard/Map/components/MockPlacesService');
-        
-        const mockPlaces = await MockPlacesService.searchPlaces(
-          latitude,
-          longitude,
-          type,
-          radiusInMeters
-        );
-        
-        const executionTime = Date.now() - startTime;
-        console.log(`Generated ${mockPlaces.length} mock places as fallback in ${executionTime}ms`);
-        
-        // Trả về dữ liệu mock với header đặc biệt để chỉ ra rằng đây là dữ liệu giả
-        return NextResponse.json(mockPlaces, {
-          headers: {
-            'X-Data-Source': 'mock',
-            'X-Execution-Time': executionTime.toString(),
-            'X-Result-Count': mockPlaces.length.toString(),
-          }
-        });
-      } catch (mockError) {
-        // Nếu cả dịch vụ mock cũng thất bại
-        console.error('Mock service also failed:', mockError);
-        
-        // Trả về lỗi gốc từ TripAdvisor API
-        return NextResponse.json(
-          { 
-            error: 'Failed to fetch places', 
-            details: tripadvisorError instanceof Error ? tripadvisorError.message : 'Unknown error',
-            timestamp: new Date().toISOString()
-          },
-          { status: 500 }
-        );
-      }
+     
     }
   } catch (error) {
     // Xử lý lỗi tổng thể
