@@ -15,7 +15,9 @@ import {
   AlertCircle, Info, Trash2, Settings, Filter,
   Search, SortAsc, Map, List, Grid, TrendingUp, 
   Award, Target, Sparkles, Timer, Route, Activity, 
-  Globe, RefreshCw, Bell, Bookmark, ExternalLink, Building2, ShoppingBag, Umbrella, Trees, Music2 
+  Globe, RefreshCw, Bell, Bookmark, ExternalLink, Building2, 
+  ShoppingBag, Umbrella, Trees, Music2, ChevronDown,
+  X
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import EnhancedPlaceSearchPanel from '@/app/trip-planner/components/EnhancedPlaceSearchPanel';
@@ -145,6 +147,7 @@ const placeTypeConfig = {
   nature: { icon: Trees, color: 'bg-emerald-100 text-emerald-800', label: 'Công viên và thiên nhiên' },
   entertainment: { icon: Music2, color: 'bg-pink-100 text-pink-800', label: 'Giải trí và vui chơi' }
 };
+
 // Helper function to get place type info with fallback
 const getPlaceTypeInfo = (place: Place) => {
   // First try to use the category from the place
@@ -179,6 +182,36 @@ const getPriceLevelIndicator = (level?: number) => {
   );
 };
 
+// Toast notification system
+const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+  const toast = document.createElement('div');
+  toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg text-white z-50 transform transition-all duration-300 flex items-center space-x-2 ${
+    type === 'success' ? 'bg-green-500' : 
+    type === 'error' ? 'bg-red-500' : 
+    'bg-blue-500'
+  }`;
+  
+  const icon = type === 'success' ? '✓' : type === 'error' ? '✗' : 'ℹ';
+  toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+  
+  document.body.appendChild(toast);
+  
+  // Animate in
+  setTimeout(() => {
+    toast.style.transform = 'translateX(0)';
+  }, 100);
+  
+  // Remove after delay
+  setTimeout(() => {
+    toast.style.transform = 'translateX(100%)';
+    setTimeout(() => {
+      if (document.body.contains(toast)) {
+        document.body.removeChild(toast);
+      }
+    }, 300);
+  }, 3000);
+};
+
 // Modern loading component
 const LoadingSpinner = () => (
   <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -195,6 +228,100 @@ const LoadingSpinner = () => (
   </div>
 );
 
+// Enhanced Status Badge Component
+const StatusBadge = ({ status, isEditing, onStatusChange, quickChange = false }: {
+  status: 'draft' | 'planned' | 'completed';
+  isEditing: boolean;
+  onStatusChange?: (status: 'draft' | 'planned' | 'completed') => void;
+  quickChange?: boolean;
+}) => {
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  
+  const getStatusConfig = (status: 'draft' | 'planned' | 'completed') => {
+    switch (status) {
+      case 'draft':
+        return { 
+          label: 'Bản nháp', 
+          color: 'bg-gray-100 text-gray-800 border-gray-200',
+          icon: <Edit className="w-4 h-4" />
+        };
+      case 'planned':
+        return { 
+          label: 'Đã lên kế hoạch', 
+          color: 'bg-blue-100 text-blue-800 border-blue-200',
+          icon: <Calendar className="w-4 h-4" />
+        };
+      case 'completed':
+        return { 
+          label: 'Đã hoàn thành', 
+          color: 'bg-green-100 text-green-800 border-green-200',
+          icon: <CheckCircle2 className="w-4 h-4" />
+        };
+    }
+  };
+
+  const config = getStatusConfig(status);
+  
+  if (!isEditing && !quickChange) {
+    return (
+      <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full border ${config.color}`}>
+        {config.icon}
+        <span className="text-sm font-medium">{config.label}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => !isUpdating && setShowDropdown(!showDropdown)}
+        disabled={isUpdating}
+        className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full border ${config.color} hover:shadow-md transition-all disabled:opacity-50`}
+      >
+        {isUpdating ? <RefreshCw className="w-4 h-4 animate-spin" /> : config.icon}
+        <span className="text-sm font-medium">{config.label}</span>
+        <ChevronDown className="w-3 h-3" />
+      </button>
+      
+      {showDropdown && !isUpdating && (
+        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-48">
+          {(['draft', 'planned', 'completed'] as const).map(statusOption => {
+            const optionConfig = getStatusConfig(statusOption);
+            return (
+              <button
+                key={statusOption}
+                onClick={async () => {
+                  if (quickChange && onStatusChange) {
+                    setIsUpdating(true);
+                    try {
+                      await onStatusChange(statusOption);
+                    } finally {
+                      setIsUpdating(false);
+                    }
+                  } else {
+                    onStatusChange?.(statusOption);
+                  }
+                  setShowDropdown(false);
+                }}
+                className={`w-full flex items-center space-x-2 px-4 py-2 text-left hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg transition-colors ${
+                  statusOption === status ? 'bg-blue-50' : ''
+                }`}
+              >
+                {optionConfig.icon}
+                <span className="text-sm">{optionConfig.label}</span>
+                {statusOption === status && (
+                  <CheckCircle2 className="w-3 h-3 text-blue-600 ml-auto" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Enhanced place card component
 const PlaceCard = ({ place, dayNumber, isEditing, onUpdate, onRemove }: {
   place: Place;
@@ -203,7 +330,6 @@ const PlaceCard = ({ place, dayNumber, isEditing, onUpdate, onRemove }: {
   onUpdate: (placeId: string, dayNumber: number, field: string, value: any) => void;
   onRemove: (placeId: string, dayNumber: number) => void;
 }) => {
-  // console.log(place)
   const [showDetails, setShowDetails] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const typeConfig = getPlaceTypeInfo(place);
@@ -396,7 +522,7 @@ const PlaceCard = ({ place, dayNumber, isEditing, onUpdate, onRemove }: {
                 onClick={() => setShowDetails(false)}
                 className="absolute top-4 right-4 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center"
               >
-                <ArrowLeft className="w-4 h-4" />
+                <X className="w-4 h-4" />
               </button>
             </div>
             <div className="p-6">
@@ -500,47 +626,63 @@ export default function ModernTripDetailsPage() {
   const [showOptimizerModal, setShowOptimizerModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [saving, setSaving] = useState(false);
-
-  // Load trip data
+ 
+  // Load trip data with enhanced weather handling
   useEffect(() => {
     const loadTripData = async () => {
       try {
         setLoading(true);
         
-        // Use the enhanced trip service
+        // Load trip data
         const tripData = await fetch(`/api/trips/${tripId}`)
           .then(response => {
             if (!response.ok) throw new Error('Failed to fetch trip');
             return response.json();
           });
-        console.log(tripData);
+
+        console.log('Trip data loaded:', tripData);
+
         // Load weather data for each day if city exists
         if (tripData.city?.id) {
-          const daysWithWeather = await Promise.all(
-            tripData.days.map(async (day: any) => {
-              try {
-                const weatherResponse = await fetch(
-                  `/api/cities/${tripData.city!.id}/weather?date=${day.date}`
-                );
-                if (weatherResponse.ok) {
-                  const weatherData = await weatherResponse.json();
-                  return { ...day, weather: weatherData };
-                }
-                return day;
-              } catch (error) {
-                console.error('Failed to load weather for day:', day.dayNumber);
-                return day;
-              }
-            })
-          );
+          console.log(`Loading weather data for city: ${tripData.city.name} (ID: ${tripData.city.id})`);
           
-          setTrip({ ...tripData, days: daysWithWeather });
+          try {
+            // Load individual weather data for each day
+            const daysWithWeather = await Promise.all(
+              tripData.days.map(async (day: any) => {
+                try {
+                  const weatherResponse = await fetch(
+                    `/api/cities/${tripData.city!.id}/weather?date=${day.date}`
+                  );
+                  
+                  if (weatherResponse.ok) {
+                    const weatherData = await weatherResponse.json();
+                    console.log(`Weather data loaded for ${day.date}:`, weatherData);
+                    return { ...day, weather: weatherData };
+                  } else {
+                    console.warn(`Failed to load weather for ${day.date}:`, weatherResponse.status);
+                    return day;
+                  }
+                } catch (error) {
+                  console.error(`Error loading weather for day ${day.dayNumber}:`, error);
+                  return day;
+                }
+              })
+            );
+            
+            setTrip({ ...tripData, days: daysWithWeather });
+          } catch (weatherError) {
+            console.error('Error with weather data handling:', weatherError);
+            setTrip(tripData);
+          }
         } else {
+          console.log('No city data available, loading trip without weather');
           setTrip(tripData);
         }
       } catch (error) {
         console.error('Error loading trip:', error);
         setTrip(null);
+        showToast('Không thể tải dữ liệu lịch trình', 'error');
       } finally {
         setLoading(false);
       }
@@ -550,6 +692,36 @@ export default function ModernTripDetailsPage() {
       loadTripData();
     }
   }, [tripId]);
+
+  // Handle status change
+  const handleStatusChange = (newStatus: 'draft' | 'planned' | 'completed') => {
+    if (!trip) return;
+    setTrip({ ...trip, status: newStatus });
+  };
+
+  // Handle quick status change (with API call)
+  const handleQuickStatusChange = async (newStatus: 'draft' | 'planned' | 'completed') => {
+    if (!trip) return;
+    
+    try {
+      const response = await fetch(`/api/trips/${tripId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      
+      if (response.ok) {
+        setTrip({ ...trip, status: newStatus });
+        showToast('Trạng thái đã được cập nhật!', 'success');
+      } else {
+        throw new Error('Failed to update status');
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+      showToast('Lỗi khi cập nhật trạng thái!', 'error');
+      throw error; // Re-throw to handle in StatusBadge
+    }
+  };
 
   // Handle drag and drop
   const handleDragEnd = (result: any) => {
@@ -643,13 +815,25 @@ export default function ModernTripDetailsPage() {
       if (!response.ok) throw new Error('Failed to save trip');
       
       setIsEditing(false);
-      // Show success message
+      showToast('Lịch trình đã được lưu thành công!', 'success');
     } catch (error) {
       console.error('Error saving trip:', error);
-      // Show error message
+      showToast('Lỗi khi lưu lịch trình!', 'error');
     } finally {
       setSaving(false);
     }
+  };
+
+  // Handle share
+  const handleShare = (type: 'link' | 'pdf') => {
+    if (type === 'link') {
+      navigator.clipboard.writeText(window.location.href);
+      showToast('Đã sao chép liên kết!', 'success');
+    } else {
+      // Navigate to print page
+      router.push(`/trip-planner/${tripId}/print`);
+    }
+    setShowShareModal(false);
   };
 
   if (loading) {
@@ -728,6 +912,18 @@ export default function ModernTripDetailsPage() {
                   <List className="w-4 h-4" />
                 </button>
               </div>
+
+              {/* Quick status change for non-editing mode */}
+              {!isEditing && (
+                <div className="flex items-center space-x-1 bg-gray-100 rounded-xl p-1">
+                  <StatusBadge 
+                    status={trip.status} 
+                    isEditing={false}
+                    onStatusChange={handleQuickStatusChange}
+                    quickChange={true}
+                  />
+                </div>
+              )}
 
               {/* Action buttons */}
               <button
@@ -812,7 +1008,11 @@ export default function ModernTripDetailsPage() {
                 )}
                 <div className="flex items-center text-white/80">
                   <Sparkles className="w-5 h-5 mr-2" />
-                  <span className="capitalize">{trip.status === 'draft' ? 'Bản nháp' : trip.status === 'planned' ? 'Đã lên kế hoạch' : 'Đã hoàn thành'}</span>
+                  <StatusBadge 
+                    status={trip.status} 
+                    isEditing={isEditing}
+                    onStatusChange={handleStatusChange}
+                  />
                 </div>
               </div>
             </div>
@@ -896,6 +1096,16 @@ export default function ModernTripDetailsPage() {
                   <span className="text-sm text-gray-600">Trung bình/ngày</span>
                   <span className="font-semibold">{(trip.days.reduce((sum, day) => sum + day.places.length, 0) / trip.numDays).toFixed(1)}</span>
                 </div>
+                
+                {/* Status display in statistics */}
+                <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+                  <span className="text-sm text-gray-600">Trạng thái</span>
+                  <StatusBadge 
+                    status={trip.status} 
+                    isEditing={false}
+                  />
+                </div>
+                
                 {trip.estimatedBudget && (
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Ngân sách</span>
@@ -1025,6 +1235,7 @@ export default function ModernTripDetailsPage() {
                     places: [...newDays[dayIndex].places, place]
                   };
                   setTrip({ ...trip!, days: newDays });
+                  showToast('Đã thêm địa điểm thành công!', 'success');
                 }
                 setShowAddPlaceModal(false);
               }}
@@ -1047,12 +1258,15 @@ export default function ModernTripDetailsPage() {
                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
                 onClick={() => setShowShareModal(false)}
               >
-                <ArrowLeft className="w-5 h-5" />
+                <X className="w-5 h-5" />
               </button>
             </div>
             
             <div className="space-y-4">
-              <button className="w-full flex items-center p-4 border rounded-xl hover:bg-gray-50 transition-colors">
+              <button 
+                onClick={() => handleShare('link')}
+                className="w-full flex items-center p-4 border rounded-xl hover:bg-gray-50 transition-colors"
+              >
                 <Share className="w-6 h-6 text-blue-600 mr-4" />
                 <div className="text-left">
                   <h3 className="font-medium text-gray-900">Sao chép liên kết</h3>
@@ -1060,7 +1274,10 @@ export default function ModernTripDetailsPage() {
                 </div>
               </button>
               
-              <button className="w-full flex items-center p-4 border rounded-xl hover:bg-gray-50 transition-colors">
+              <button 
+                onClick={() => handleShare('pdf')}
+                className="w-full flex items-center p-4 border rounded-xl hover:bg-gray-50 transition-colors"
+              >
                 <Download className="w-6 h-6 text-green-600 mr-4" />
                 <div className="text-left">
                   <h3 className="font-medium text-gray-900">Tải xuống PDF</h3>
@@ -1079,6 +1296,7 @@ export default function ModernTripDetailsPage() {
           onUpdateTrip={(updatedTrip) => {
             setTrip(updatedTrip);
             setShowOptimizerModal(false);
+            showToast('Lịch trình đã được tối ưu hóa!', 'success');
           }}
           onClose={() => setShowOptimizerModal(false)}
         />

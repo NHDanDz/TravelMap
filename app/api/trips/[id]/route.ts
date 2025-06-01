@@ -23,7 +23,7 @@ export async function GET(request: NextRequest, { params }: Params) {
               include: {
                 place: {
                   include: {
-                    category: true, // Include category information
+                    category: true,
                     city: true
                   }
                 }
@@ -72,9 +72,9 @@ export async function GET(request: NextRequest, { params }: Params) {
         places: day.itineraryItems.map(item => ({
           id: item.place?.id.toString() || item.id.toString(),
           name: item.place?.name || '',
-          type: item.place?.category?.name || 'other', // Lấy type từ category name
+          type: item.place?.category?.name || 'other',
           categoryId: item.place?.categoryId,
-          category: item.place?.category, // Include full category object
+          category: item.place?.category,
           address: item.place?.address || '',
           latitude: item.place?.latitude?.toString() || '0',
           longitude: item.place?.longitude?.toString() || '0',
@@ -86,7 +86,6 @@ export async function GET(request: NextRequest, { params }: Params) {
           openingHours: item.place?.openingHours,
           rating: item.place?.rating ? parseFloat(item.place.rating.toString()) : undefined,
           description: item.place?.description,
-          // Thêm các field khác nếu cần
           orderIndex: item.orderIndex,
           estimatedCost: item.place?.priceLevel ? getPriceEstimate(item.place.priceLevel) : undefined
         }))
@@ -94,7 +93,6 @@ export async function GET(request: NextRequest, { params }: Params) {
       tags: trip.tags.map(tripTag => tripTag.tag.name),
       user: trip.user,
       city: trip.city,
-      // Thêm thống kê tổng quan
       totalPlaces: trip.days.reduce((total, day) => total + day.itineraryItems.length, 0),
       placesCount: trip.days.reduce((total, day) => total + day.itineraryItems.length, 0)
     };
@@ -135,6 +133,43 @@ function formatTimeFromDB(timeValue: any): string | undefined {
   }
 }
 
+// Helper function để convert time string to DateTime for database
+function formatTimeForDB(timeString: string, date: string): Date | null {
+  if (!timeString || !date) return null;
+  
+  try {
+    // Tạo DateTime object từ date và time
+    const dateTime = new Date(`${date}T${timeString}:00.000Z`);
+    
+    // Kiểm tra xem date có valid không
+    if (isNaN(dateTime.getTime())) {
+      console.error('Invalid date created:', `${date}T${timeString}:00.000Z`);
+      return null;
+    }
+    
+    return dateTime;
+  } catch (error) {
+    console.error('Error creating DateTime:', error);
+    return null;
+  }
+}
+
+// Alternative approach - store as separate date and time
+function formatTimeForDBAlternative(timeString: string, baseDate: Date): Date | null {
+  if (!timeString) return null;
+  
+  try {
+    const [hours, minutes] = timeString.split(':').map(Number);
+    const dateTime = new Date(baseDate);
+    dateTime.setHours(hours, minutes, 0, 0);
+    
+    return dateTime;
+  } catch (error) {
+    console.error('Error creating DateTime from time:', error);
+    return null;
+  }
+}
+
 // Helper function để estimate giá từ price level
 function getPriceEstimate(priceLevel: string): number | undefined {
   const priceMap: { [key: string]: number } = {
@@ -145,6 +180,7 @@ function getPriceEstimate(priceLevel: string): number | undefined {
   
   return priceMap[priceLevel.toLowerCase()] || undefined;
 }
+
 // PUT - Cập nhật trip
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
@@ -221,13 +257,31 @@ export async function PUT(request: NextRequest, { params }: Params) {
                 });
               }
 
+              // Prepare startTime and endTime as DateTime objects
+              const dayDate = new Date(dayData.date);
+              const startDateTime = placeData.startTime ? 
+                formatTimeForDBAlternative(placeData.startTime, dayDate) : null;
+              const endDateTime = placeData.endTime ? 
+                formatTimeForDBAlternative(placeData.endTime, dayDate) : null;
+
+              // Log để debug
+              console.log('Creating itinerary item:', {
+                tripDayId: tripDay.id,
+                placeId: place.id,
+                startTime: startDateTime?.toISOString(),
+                endTime: endDateTime?.toISOString(),
+                originalStartTime: placeData.startTime,
+                originalEndTime: placeData.endTime,
+                dayDate: dayData.date
+              });
+
               // Tạo itinerary item
               await tx.itineraryItem.create({
                 data: {
                   tripDayId: tripDay.id,
                   placeId: place.id,
-                  startTime: placeData.startTime ? `${placeData.startTime}:00` : null,
-                  endTime: placeData.endTime ? `${placeData.endTime}:00` : null,
+                  startTime: startDateTime,
+                  endTime: endDateTime,
                   durationMinutes: placeData.duration,
                   notes: placeData.notes,
                   orderIndex: i
@@ -244,7 +298,17 @@ export async function PUT(request: NextRequest, { params }: Params) {
     return NextResponse.json({ success: true, trip: result });
   } catch (error) {
     console.error('Error updating trip:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    
+    // Provide more detailed error information
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    console.error('Error details:', { message: errorMessage, stack: errorStack });
+    
+    return NextResponse.json({ 
+      error: 'Internal server error', 
+      details: errorMessage 
+    }, { status: 500 });
   }
 }
 
@@ -266,7 +330,6 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
 // Helper function để map category ID sang type
 function getPlaceType(categoryId: number | null | undefined): string {
-  // Mapping dựa trên categories trong DB
   const categoryMap: Record<number, string> = {
     1: 'tourist_attraction',
     2: 'restaurant', 
