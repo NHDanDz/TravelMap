@@ -167,6 +167,76 @@ const getPlaceTypeInfo = (place: Place) => {
   return placeTypeConfig.tourist_attraction;
 };
 
+// Enhanced Day Stats with map integration
+const DayStatsWithMap = ({ day, tripId }: { day: Day; tripId: string }) => {
+  const placesWithCoordinates = day.places.filter(place => 
+    place.latitude && place.longitude && 
+    parseFloat(place.latitude) !== 0 && parseFloat(place.longitude) !== 0
+  );
+  
+  return (
+    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold">Ngày {day.dayNumber}</h2>
+          <p className="text-blue-100">{new Date(day.date).toLocaleDateString('vi-VN', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          })}</p>
+        </div>
+        <div className="text-right">
+          <div className="text-2xl font-bold">{day.places.length}</div>
+          <div className="text-sm text-blue-100">địa điểm</div>
+          <div className="text-xs text-blue-200 mt-1">
+            {placesWithCoordinates.length} có tọa độ
+          </div>
+        </div>
+      </div>
+      
+      {/* Quick Map View Button */}
+      {placesWithCoordinates.length > 0 && (
+        <div className="mt-4 flex space-x-2">
+          <Link
+            href={`/trip-planner/${tripId}/map?day=${day.dayNumber}`}
+            className="inline-flex items-center space-x-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+          >
+            <Map className="w-4 h-4" />
+            <span className="text-sm font-medium">Xem trên bản đồ</span>
+          </Link>
+          
+          {placesWithCoordinates.length >= 2 && (
+            <Link
+              href={`/trip-planner/${tripId}/map?day=${day.dayNumber}&route=true`}
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+            >
+              <Route className="w-4 h-4" />
+              <span className="text-sm font-medium">Xem tuyến đường</span>
+            </Link>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Floating Map Action Button (add to main content area)
+const FloatingMapButton = ({ tripId, activeDay }: { tripId: string; activeDay: number }) => {
+  return (
+    <div className="fixed bottom-6 right-6 z-50">
+      <Link
+        href={`/trip-planner/${tripId}/map?day=${activeDay}`}
+        className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-medium"
+      >
+        <Map className="w-5 h-5" />
+        <span>Xem bản đồ</span>
+      </Link>
+    </div>
+  );
+};
+
+
 // Price level indicators
 const getPriceLevelIndicator = (level?: number) => {
   if (!level) return null;
@@ -323,12 +393,13 @@ const StatusBadge = ({ status, isEditing, onStatusChange, quickChange = false }:
 };
 
 // Enhanced place card component
-const PlaceCard = ({ place, dayNumber, isEditing, onUpdate, onRemove }: {
+const PlaceCard = ({ place, dayNumber, isEditing, onUpdate, onRemove, tripId }: {
   place: Place;
   dayNumber: number;
   isEditing: boolean;
   onUpdate: (placeId: string, dayNumber: number, field: string, value: any) => void;
   onRemove: (placeId: string, dayNumber: number) => void;
+  tripId: string;
 }) => {
   const [showDetails, setShowDetails] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
@@ -336,7 +407,8 @@ const PlaceCard = ({ place, dayNumber, isEditing, onUpdate, onRemove }: {
   const TypeIcon = typeConfig.icon;
 
   const photos = place.photos || [{ id: 1, url: place.image, isPrimary: true, caption: place.name }];
-
+  const hasValidCoordinates = place.latitude && place.longitude && 
+  parseFloat(place.latitude) !== 0 && parseFloat(place.longitude) !== 0;
   return (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-lg transition-all duration-300">
       {/* Image Gallery */}
@@ -505,10 +577,35 @@ const PlaceCard = ({ place, dayNumber, isEditing, onUpdate, onRemove }: {
               <span>Website</span>
             </a>
           )}
-          <button className="flex-1 flex items-center justify-center space-x-1 text-xs bg-gray-50 text-gray-700 py-2 rounded-lg hover:bg-gray-100 transition-colors">
-            <Navigation className="w-3 h-3" />
-            <span>Chỉ đường</span>
-          </button>
+          
+          {hasValidCoordinates ? (
+            <button 
+              onClick={() => {
+                const url = `https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}`;
+                window.open(url, '_blank');
+              }}
+              className="flex-1 flex items-center justify-center space-x-1 text-xs bg-green-50 text-green-700 py-2 rounded-lg hover:bg-green-100 transition-colors"
+            >
+              <Navigation className="w-3 h-3" />
+              <span>Chỉ đường</span>
+            </button>
+          ) : (
+            <div className="flex-1 flex items-center justify-center space-x-1 text-xs bg-gray-50 text-gray-500 py-2 rounded-lg cursor-not-allowed">
+              <Navigation className="w-3 h-3" />
+              <span>Không có tọa độ</span>
+            </div>
+          )}
+          
+          {/* View on Map button */}
+          {hasValidCoordinates && (
+            <Link
+              href={`/trip-planner/${tripId}/map?day=${dayNumber}&place=${place.id}`}
+              className="flex items-center justify-center space-x-1 text-xs bg-purple-50 text-purple-700 py-2 px-3 rounded-lg hover:bg-purple-100 transition-colors"
+              title="Xem trên bản đồ"
+            >
+              <Map className="w-3 h-3" />
+            </Link>
+          )}
         </div>
       </div>
 
@@ -933,7 +1030,13 @@ export default function ModernTripDetailsPage() {
               >
                 <Sparkles className="w-5 h-5" />
               </button>
-              
+              <Link
+                href={`/trip-planner/${tripId}/map`}
+                className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+                title="Xem trên bản đồ"
+              >
+                <Map className="w-5 h-5" />
+              </Link>
               <button
                 onClick={() => setShowShareModal(true)}
                 className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
@@ -1190,6 +1293,7 @@ export default function ModernTripDetailsPage() {
                                       isEditing={isEditing}
                                       onUpdate={handleUpdatePlace}
                                       onRemove={handleRemovePlace}
+                                      tripId={tripId}
                                     />
                                   </div>
                                 )}
@@ -1301,6 +1405,8 @@ export default function ModernTripDetailsPage() {
           onClose={() => setShowOptimizerModal(false)}
         />
       )}
+      <FloatingMapButton tripId={tripId} activeDay={activeDay} />
+
     </div>
   );
 }
