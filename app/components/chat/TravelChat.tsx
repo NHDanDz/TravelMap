@@ -90,8 +90,8 @@ export const TravelChat: React.FC<TravelChatProps> = ({
       const userId = currentUser ? JSON.parse(currentUser).id || JSON.parse(currentUser).username : null;
       
       // Store last known user to detect changes
-      if (ChatService['lastKnownUserId'] !== userId) {
-        ChatService['lastKnownUserId'] = userId;
+      if (ChatService.getLastKnownUserId() !== userId) {
+        ChatService.setLastKnownUserId(userId);
         handleUserChange();
       }
     };

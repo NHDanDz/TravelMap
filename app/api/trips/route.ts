@@ -86,6 +86,66 @@ async function findOrCreateCity(destination: string, tx: any) {
   return city;
 }
 
+// Helper function để tìm hoặc tạo category
+async function findOrCreateCategory(type: string, tx: any) {
+  if (!type) return null;
+  
+  // Tìm category theo tên (không phân biệt hoa thường)
+  let category = await tx.category.findFirst({
+    where: {
+      name: {
+        equals: type,
+        mode: 'insensitive'
+      }
+    }
+  });
+
+  // Nếu không tìm thấy, tạo category mới
+  if (!category) {
+    // Tạo icon và description mặc định dựa trên type
+    const getDefaultCategoryData = (type: string) => {
+      const typeMap: { [key: string]: { icon: string; description: string } } = {
+        'restaurant': { icon: '🍽️', description: 'Nhà hàng và ăn uống' },
+        'tourist_attraction': { icon: '🏛️', description: 'Điểm tham quan du lịch' },
+        'shopping': { icon: '🛍️', description: 'Mua sắm' },
+        'hotel': { icon: '🏨', description: 'Khách sạn và lưu trú' },
+        'entertainment': { icon: '🎭', description: 'Giải trí' },
+        'museum': { icon: '🏛️', description: 'Bảo tàng' },
+        'park': { icon: '🌳', description: 'Công viên' },
+        'temple': { icon: '⛩️', description: 'Đền chùa' },
+        'beach': { icon: '🏖️', description: 'Bãi biển' },
+        'mountain': { icon: '⛰️', description: 'Núi đồi' },
+        'cafe': { icon: '☕', description: 'Quán cà phê' },
+        'bar': { icon: '🍸', description: 'Quán bar' },
+        'market': { icon: '🏪', description: 'Chợ, siêu thị' },
+        'hospital': { icon: '🏥', description: 'Bệnh viện, y tế' },
+        'school': { icon: '🏫', description: 'Trường học' },
+        'bank': { icon: '🏦', description: 'Ngân hàng' },
+        'gas_station': { icon: '⛽', description: 'Cây xăng' },
+        'gym': { icon: '💪', description: 'Phòng tập gym' },
+        'spa': { icon: '💆', description: 'Spa, massage' },
+        'cinema': { icon: '🎬', description: 'Rạp chiếu phim' }
+      };
+
+      return typeMap[type.toLowerCase()] || { icon: '📍', description: `Danh mục ${type}` };
+    };
+
+    const categoryData = getDefaultCategoryData(type);
+    
+    category = await tx.category.create({
+      data: {
+        name: type,
+        icon: categoryData.icon,
+        description: categoryData.description
+      }
+    });
+  }
+
+  return category;
+}
+
+
+
 // GET - Lấy danh sách trips
 export async function GET(request: NextRequest) {
   try {
@@ -121,7 +181,12 @@ export async function GET(request: NextRequest) {
           include: {
             itineraryItems: {
               include: {
-                place: true
+                place: {
+                  include: {
+                    category: true, // Include category information
+                    city: true
+                  }
+                }
               },
               orderBy: { orderIndex: 'asc' }
             }
@@ -154,7 +219,33 @@ export async function GET(request: NextRequest) {
       tags: trip.tags.map(tripTag => tripTag.tag.name),
       estimatedBudget: undefined,
       travelCompanions: 1,
-      city: trip.city
+      city: trip.city,
+      // Thêm detailed data cho frontend nếu cần
+      days: trip.days.map(day => ({
+        id: day.id,
+        dayNumber: day.dayNumber,
+        date: day.date.toISOString().split('T')[0],
+        notes: day.notes,
+        places: day.itineraryItems.map(item => ({
+          id: item.id,
+          name: item.place?.name,
+          address: item.place?.address,
+          latitude: item.place?.latitude,
+          longitude: item.place?.longitude,
+          type: item.place?.category?.name, // Lấy type từ category name
+          categoryId: item.place?.categoryId,
+          category: item.place?.category,
+          startTime: item.startTime,
+          endTime: item.endTime,
+          duration: item.durationMinutes,
+          notes: item.notes,
+          orderIndex: item.orderIndex,
+          rating: item.place?.rating,
+          imageUrl: item.place?.imageUrl,
+          description: item.place?.description,
+          openingHours: item.place?.openingHours
+        }))
+      }))
     }));
 
     return NextResponse.json(transformedTrips);
@@ -163,11 +254,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-
-// POST - Tạo trip mới với city management
+// POST - Tạo trip mới với city management và category linking
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    console.log('Creating trip with data:', body);
     const {
       name,
       destination,
@@ -182,7 +273,7 @@ export async function POST(request: NextRequest) {
     if (!name || !destination || !startDate || !endDate || !userId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
-
+    
     // Tạo trip với transaction
     const result = await prisma.$transaction(async (tx) => {
       // Tìm hoặc tạo city dựa trên destination
@@ -224,6 +315,13 @@ export async function POST(request: NextRequest) {
             for (let i = 0; i < dayData.places.length; i++) {
               const placeData = dayData.places[i];
               
+              // Tìm hoặc tạo category nếu có type
+              let categoryId = null;
+              if (placeData.type) {
+                const category = await findOrCreateCategory(placeData.type, tx);
+                categoryId = category?.id || null;
+              }
+              
               // Tìm hoặc tạo place
               let place = await tx.place.findFirst({
                 where: {
@@ -241,12 +339,25 @@ export async function POST(request: NextRequest) {
                     latitude: parseFloat(placeData.latitude),
                     longitude: parseFloat(placeData.longitude),
                     cityId: finalCityId, // Link place to the city
+                    categoryId: categoryId, // Link place to category
                     imageUrl: placeData.image,
                     openingHours: placeData.openingHours,
                     avgDurationMinutes: placeData.duration,
-                    rating: placeData.rating ? parseFloat(placeData.rating.toString()) : null
+                    rating: placeData.rating ? parseFloat(placeData.rating.toString()) : null,
+                    description: placeData.description || null,
+                    priceLevel: placeData.estimatedCost ? 
+                      (placeData.estimatedCost > 500000 ? 'expensive' : 
+                       placeData.estimatedCost > 100000 ? 'moderate' : 'cheap') : null
                   }
                 });
+              } else {
+                // Nếu place đã tồn tại nhưng chưa có category, cập nhật category
+                if (!place.categoryId && categoryId) {
+                  place = await tx.place.update({
+                    where: { id: place.id },
+                    data: { categoryId: categoryId }
+                  });
+                }
               }
 
               // Tạo itinerary item

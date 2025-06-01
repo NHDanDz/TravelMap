@@ -41,8 +41,53 @@ export default function ChatPage() {
 
   // Load sessions and initialize chat on mount
   useEffect(() => {
+    // Migrate old sessions to user-specific format
+    ChatService.migrateToUserSpecificSessions();
     loadSessions();
     initializeChat();
+  }, []);
+
+  // Reset chat when user changes
+  useEffect(() => {
+    const handleUserChange = () => {
+      // Clear current state
+      setCurrentSession(null);
+      setMessages([]);
+      setCurrentResponse('');
+      setError(null);
+      setSessions([]);
+      
+      // Reload for new user
+      ChatService.migrateToUserSpecificSessions();
+      loadSessions();
+      initializeChat();
+    };
+
+    // Listen for storage changes (when user logs in/out)
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'user') {
+        handleUserChange();
+      }
+    });
+
+    // Check for user changes periodically
+    const checkUserChange = () => {
+      const currentUser = localStorage.getItem('user');
+      const userId = currentUser ? JSON.parse(currentUser).id || JSON.parse(currentUser).username : null;
+      
+      // Store last known user to detect changes
+      if (ChatService.getLastKnownUserId() !== userId) {
+        ChatService.setLastKnownUserId(userId);
+        handleUserChange();
+      }
+    };
+
+    const interval = setInterval(checkUserChange, 1000);
+
+    return () => {
+      window.removeEventListener('storage', handleUserChange);
+      clearInterval(interval);
+    };
   }, []);
 
   // Auto-resize textarea

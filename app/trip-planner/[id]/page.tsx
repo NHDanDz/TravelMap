@@ -6,15 +6,99 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
 import { 
-  Calendar, Clock, MapPin, ChevronLeft, Share, Trash2, Edit, 
-  Plus, Download, Printer, ArrowLeft, ArrowRight, MoreHorizontal,
-  Save, Compass
+  Calendar, Clock, MapPin, ChevronLeft, Share, Edit, 
+  Plus, Download, ArrowLeft, ArrowRight, MoreHorizontal,
+  Save, Compass, Star, Users, DollarSign, Camera,
+  Cloud, Sun, CloudRain, Zap, Heart, MessageCircle,
+  Navigation, Coffee, Utensils, Building, Landmark,
+  Thermometer, Droplets, Wind, Eye, CheckCircle2,
+  AlertCircle, Info, Trash2, Settings, Filter,
+  Search, SortAsc, Map, List, Grid, TrendingUp, 
+  Award, Target, Sparkles, Timer, Route, Activity, 
+  Globe, RefreshCw, Bell, Bookmark, ExternalLink, Building2, ShoppingBag, Umbrella, Trees, Music2 
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { TripService } from '@/services/tripService';
-import {  Day, Place, City } from '@/types/trip';
+import EnhancedPlaceSearchPanel from '@/app/trip-planner/components/EnhancedPlaceSearchPanel';
+import EnhancedTripOptimizer from '@/app/trip-planner/components/EnhancedTripOptimizer';
 
- 
+// Types
+interface Photo {
+  id: number;
+  url: string;
+  caption?: string;
+  isPrimary: boolean;
+}
+
+interface Review {
+  id: number;
+  rating: number;
+  comment: string;
+  visitDate: string;
+  createdAt: string;
+  user: {
+    id: number;
+    username: string;
+    avatarUrl?: string;
+  };
+}
+
+interface Category {
+  id: number;
+  name: string;
+  icon?: string;
+  description?: string;
+}
+
+interface City {
+  id: number;
+  name: string;
+  country: string;
+  description?: string;
+  imageUrl?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+interface Place {
+  id: string;
+  name: string;
+  type: string;
+  address: string;
+  latitude: string;
+  longitude: string;
+  image: string;
+  startTime?: string;
+  endTime?: string;
+  duration?: number;
+  notes?: string;
+  openingHours?: string;
+  rating?: number;
+  category?: Category;
+  photos?: Photo[];
+  reviews?: Review[];
+  website?: string;
+  contactInfo?: string;
+  priceLevel?: number;
+  avgDurationMinutes?: number;
+  description?: string;
+}
+
+interface WeatherData {
+  id: number;
+  date: string;
+  temperatureHigh: number;
+  temperatureLow: number;
+  condition: string;
+  precipitationChance: number;
+}
+
+interface Day {
+  dayNumber: number;
+  date: string;
+  places: Place[];
+  weather?: WeatherData;
+  notes?: string;
+}
 
 interface Trip {
   id: string;
@@ -27,180 +111,381 @@ interface Trip {
   days: Day[];
   status: 'draft' | 'planned' | 'completed';
   description?: string;
-  city?: City
+  city?: City;
+  user?: {
+    id: number;
+    username: string;
+    fullName?: string;
+  };
+  tags?: string[];
+  estimatedBudget?: number;
+  travelCompanions?: number;
 }
 
-// Dummy place data (to simulate saved places)
-const savedPlaces: Place[] = [
-  {
-    id: 'place1',
-    name: 'Hồ Hoàn Kiếm',
-    type: 'tourist_attraction',
-    address: 'Phố Đinh Tiên Hoàng, Quận Hoàn Kiếm, Hà Nội',
-    latitude: '21.0278',
-    longitude: '105.8523',
-    image: '/images/place-3.jpg',
-    openingHours: '6:00 - 20:00',
-    duration: 90
-  },
-  {
-    id: 'place2',
-    name: 'Văn Miếu - Quốc Tử Giám',
-    type: 'tourist_attraction',
-    address: '58 Phố Quốc Tử Giám, Quận Đống Đa, Hà Nội',
-    latitude: '21.0274',
-    longitude: '105.8354',
-    image: '/images/place-1.jpg',
-    openingHours: '8:00 - 17:00',
-    duration: 120
-  },
-  {
-    id: 'place3',
-    name: 'Chùa Trấn Quốc',
-    type: 'tourist_attraction',
-    address: 'Thanh Niên, Quận Tây Hồ, Hà Nội',
-    latitude: '21.0492',
-    longitude: '105.8350',
-    image: '/images/pagoda-1.jpg',
-    openingHours: '7:30 - 18:00',
-    duration: 60
-  },
-  {
-    id: 'place4',
-    name: 'Nhà hàng Chả Cá Lã Vọng',
-    type: 'restaurant',
-    address: '14 Chả Cá, Quận Hoàn Kiếm, Hà Nội',
-    latitude: '21.0323',
-    longitude: '105.8508',
-    image: '/images/restaurant-1.jpg',
-    openingHours: '10:00 - 22:00',
-    duration: 90
-  },
-  {
-    id: 'place5',
-    name: 'Lăng Chủ tịch Hồ Chí Minh',
-    type: 'tourist_attraction',
-    address: '2 Hùng Vương, Điện Bàn, Ba Đình, Hà Nội',
-    latitude: '21.0369',
-    longitude: '105.8353',
-    image: '/images/place-2.jpg',
-    openingHours: '7:30 - 10:30, 14:00 - 16:00',
-    duration: 60
-  },
-  {
-    id: 'place6',
-    name: 'Phố cổ Hà Nội',
-    type: 'tourist_attraction',
-    address: 'Quận Hoàn Kiếm, Hà Nội',
-    latitude: '21.0340',
-    longitude: '105.8500',
-    image: '/images/place-4.jpg',
-    openingHours: '24/7',
-    duration: 180
-  },
-  {
-    id: 'place7',
-    name: 'Bảo tàng Lịch sử Quốc gia',
-    type: 'tourist_attraction',
-    address: '1 Tràng Tiền, Quận Hoàn Kiếm, Hà Nội',
-    latitude: '21.0243',
-    longitude: '105.8583',
-    image: '/images/museum-1.jpg',
-    openingHours: '8:00 - 17:00',
-    duration: 120
-  },
-  {
-    id: 'place8',
-    name: 'Highlands Coffee - Nhà hát Lớn',
-    type: 'cafe',
-    address: '1 Tràng Tiền, Quận Hoàn Kiếm, Hà Nội',
-    latitude: '21.0244',
-    longitude: '105.8573',
-    image: '/images/cafe-1.jpg',
-    openingHours: '7:00 - 22:00',
-    duration: 60
+// Weather icon mapping
+const getWeatherIcon = (condition: string) => {
+  switch (condition) {
+    case 'sunny': return <Sun className="w-5 h-5 text-yellow-500" />;
+    case 'cloudy': return <Cloud className="w-5 h-5 text-gray-500" />;
+    case 'rain': return <CloudRain className="w-5 h-5 text-blue-500" />;
+    case 'thunderstorm': return <Zap className="w-5 h-5 text-purple-500" />;
+    default: return <Sun className="w-5 h-5 text-yellow-500" />;
   }
-];
+};
 
-// Sample trip data
-const sampleTrip: Trip = {
-  id: 'trip1',
-  name: 'Khám phá Hà Nội',
-  destination: 'Hà Nội',
-  startDate: '2025-04-20',
-  endDate: '2025-04-23',
-  coverImage: '/images/ha-noi.jpg',
-  numDays: 4,
-  status: 'planned',
-  description: 'Khám phá các địa điểm nổi tiếng và ẩm thực đặc sắc của thủ đô nghìn năm văn hiến.',
-  days: [
-    {
-      dayNumber: 1,
-      date: '2025-04-20',
-      places: [savedPlaces[0], savedPlaces[3]]
-    },
-    {
-      dayNumber: 2,
-      date: '2025-04-21',
-      places: [savedPlaces[1], savedPlaces[7]]
-    },
-    {
-      dayNumber: 3,
-      date: '2025-04-22',
-      places: [savedPlaces[4], savedPlaces[2]]
-    },
-    {
-      dayNumber: 4,
-      date: '2025-04-23',
-      places: [savedPlaces[5]]
+// Place type configuration with fallback for missing icons
+const placeTypeConfig = {
+  tourist_attraction: { icon: Landmark, color: 'bg-green-100 text-green-800', label: 'Địa điểm tham quan du lịch' },
+  restaurant: { icon: Utensils, color: 'bg-red-100 text-red-800', label: 'Nhà hàng và quán ăn' },
+  cafe: { icon: Coffee, color: 'bg-amber-100 text-amber-800', label: 'Quán cà phê' },
+  hotel: { icon: Building2, color: 'bg-blue-100 text-blue-800', label: 'Khách sạn và nơi lưu trú' },
+  shopping: { icon: ShoppingBag, color: 'bg-purple-100 text-purple-800', label: 'Trung tâm mua sắm và chợ' },
+  museum: { icon: Building, color: 'bg-indigo-100 text-indigo-800', label: 'Bảo tàng và triển lãm' },
+  beach: { icon: Umbrella, color: 'bg-cyan-100 text-cyan-800', label: 'Bãi biển' },
+  nature: { icon: Trees, color: 'bg-emerald-100 text-emerald-800', label: 'Công viên và thiên nhiên' },
+  entertainment: { icon: Music2, color: 'bg-pink-100 text-pink-800', label: 'Giải trí và vui chơi' }
+};
+// Helper function to get place type info with fallback
+const getPlaceTypeInfo = (place: Place) => {
+  // First try to use the category from the place
+  if (place.category?.name) {
+    const categoryName = place.category.name.toLowerCase().replace(/\s+/g, '_');
+    if (categoryName in placeTypeConfig) {
+      return placeTypeConfig[categoryName as keyof typeof placeTypeConfig];
     }
-  ],
-  city: {
-    id: 1,
-    name: 'Hà Nội',
-    country: 'Việt Nam',
-    description: 'Thủ đô của Việt Nam, nổi tiếng với lịch sử lâu đời và văn hóa phong phú.',
-    imageUrl: '/images/ha-noi.jpg',
-    latitude: 21.0285,
-    longitude: 105.8542 
   }
+  
+  // Fallback to place.type
+  if (place.type && place.type in placeTypeConfig) {
+    return placeTypeConfig[place.type as keyof typeof placeTypeConfig];
+  }
+  
+  // Default fallback
+  return placeTypeConfig.tourist_attraction;
 };
 
-// Format date function
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString);
-  return new Intl.DateTimeFormat('vi-VN', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  }).format(date);
+// Price level indicators
+const getPriceLevelIndicator = (level?: number) => {
+  if (!level) return null;
+  return (
+    <div className="flex items-center">
+      {Array.from({ length: 4 }, (_, i) => (
+        <DollarSign
+          key={i}
+          className={`w-3 h-3 ${i < level ? 'text-green-600' : 'text-gray-300'}`}
+        />
+      ))}
+    </div>
+  );
 };
 
-// Format time helper
-const formatTime = (minutes: number): string => {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `${hours > 0 ? `${hours} giờ ` : ''}${mins > 0 ? `${mins} phút` : ''}`;
+// Modern loading component
+const LoadingSpinner = () => (
+  <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+    <div className="text-center">
+      <div className="relative">
+        <div className="w-20 h-20 border-4 border-blue-200 rounded-full animate-spin border-t-blue-600 mx-auto mb-4"></div>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Compass className="w-8 h-8 text-blue-600 animate-pulse" />
+        </div>
+      </div>
+      <h3 className="text-xl font-semibold text-gray-800 mb-2">Đang tải lịch trình</h3>
+      <p className="text-gray-600">Vui lòng đợi trong giây lát...</p>
+    </div>
+  </div>
+);
+
+// Enhanced place card component
+const PlaceCard = ({ place, dayNumber, isEditing, onUpdate, onRemove }: {
+  place: Place;
+  dayNumber: number;
+  isEditing: boolean;
+  onUpdate: (placeId: string, dayNumber: number, field: string, value: any) => void;
+  onRemove: (placeId: string, dayNumber: number) => void;
+}) => {
+  // console.log(place)
+  const [showDetails, setShowDetails] = useState(false);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const typeConfig = getPlaceTypeInfo(place);
+  const TypeIcon = typeConfig.icon;
+
+  const photos = place.photos || [{ id: 1, url: place.image, isPrimary: true, caption: place.name }];
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-lg transition-all duration-300">
+      {/* Image Gallery */}
+      <div className="relative h-48 group">
+        <Image
+          src={photos[currentPhotoIndex]?.url || place.image}
+          alt={place.name}
+          fill
+          className="object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+        
+        {/* Photo navigation */}
+        {photos.length > 1 && (
+          <>
+            <button
+              onClick={() => setCurrentPhotoIndex(prev => prev > 0 ? prev - 1 : photos.length - 1)}
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setCurrentPhotoIndex(prev => prev < photos.length - 1 ? prev + 1 : 0)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <ArrowRight className="w-4 h-4" />
+            </button>
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex space-x-1">
+              {photos.map((_, index) => (
+                <div
+                  key={index}
+                  className={`w-2 h-2 rounded-full ${index === currentPhotoIndex ? 'bg-white' : 'bg-white/50'}`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Quick actions overlay */}
+        <div className="absolute top-3 right-3 flex space-x-2">
+          <button className="w-8 h-8 bg-white/90 rounded-full flex items-center justify-center hover:bg-white transition-colors">
+            <Heart className="w-4 h-4 text-gray-600" />
+          </button>
+          <button 
+            onClick={() => setShowDetails(!showDetails)}
+            className="w-8 h-8 bg-white/90 rounded-full flex items-center justify-center hover:bg-white transition-colors"
+          >
+            <Eye className="w-4 h-4 text-gray-600" />
+          </button>
+        </div>
+
+        {/* Rating badge */}
+        {place.rating && (
+          <div className="absolute top-3 left-3 bg-white/95 rounded-full px-2 py-1 flex items-center space-x-1 backdrop-blur-sm">
+            <Star className="w-3 h-3 text-yellow-500 fill-current" />
+            <span className="text-xs font-semibold text-gray-800">{place.rating.toFixed(1)}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1">
+            <div className="flex items-center space-x-2 mb-1">
+              <div className={`p-1.5 rounded-lg ${typeConfig.color}`}>
+                <TypeIcon className="w-4 h-4" />
+              </div>
+              <span className={`text-xs font-medium px-2 py-1 rounded-full ${typeConfig.color}`}>
+                {typeConfig.label}
+              </span>
+            </div>
+            <h3 className="font-bold text-gray-900 text-lg leading-tight">{place.name}</h3>
+            <p className="text-sm text-gray-600 line-clamp-1">{place.address}</p>
+          </div>
+          
+          {isEditing && (
+            <button
+              onClick={() => onRemove(place.id, dayNumber)}
+              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Time and duration */}
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          {isEditing ? (
+            <>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Giờ bắt đầu</label>
+                <input
+                  type="time"
+                  value={place.startTime || ''}
+                  onChange={(e) => onUpdate(place.id, dayNumber, 'startTime', e.target.value)}
+                  className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Thời lượng (phút)</label>
+                <input
+                  type="number"
+                  value={place.duration || ''}
+                  onChange={(e) => onUpdate(place.id, dayNumber, 'duration', parseInt(e.target.value) || 0)}
+                  className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  min="15"
+                  step="15"
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              {place.startTime && (
+                <div className="flex items-center text-sm text-gray-600">
+                  <Clock className="w-4 h-4 mr-1" />
+                  <span>{place.startTime}</span>
+                  {place.endTime && <span> - {place.endTime}</span>}
+                </div>
+              )}
+              {place.duration && (
+                <div className="flex items-center text-sm text-gray-600">
+                  <Timer className="w-4 h-4 mr-1" />
+                  <span>{Math.floor(place.duration / 60)}h {place.duration % 60}m</span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Additional info */}
+        <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
+          {place.openingHours && (
+            <div className="flex items-center">
+              <Calendar className="w-3 h-3 mr-1" />
+              <span>{place.openingHours}</span>
+            </div>
+          )}
+          {place.priceLevel && getPriceLevelIndicator(place.priceLevel)}
+        </div>
+
+        {/* Notes */}
+        {isEditing ? (
+          <textarea
+            placeholder="Ghi chú..."
+            value={place.notes || ''}
+            onChange={(e) => onUpdate(place.id, dayNumber, 'notes', e.target.value)}
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none"
+            rows={2}
+          />
+        ) : place.notes && (
+          <div className="text-sm bg-blue-50 text-blue-800 p-2 rounded-lg">
+            {place.notes}
+          </div>
+        )}
+
+        {/* Quick links */}
+        <div className="flex items-center space-x-2 mt-3 pt-3 border-t border-gray-100">
+          {place.website && (
+            <a 
+              href={place.website} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center space-x-1 text-xs bg-blue-50 text-blue-700 py-2 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" />
+              <span>Website</span>
+            </a>
+          )}
+          <button className="flex-1 flex items-center justify-center space-x-1 text-xs bg-gray-50 text-gray-700 py-2 rounded-lg hover:bg-gray-100 transition-colors">
+            <Navigation className="w-3 h-3" />
+            <span>Chỉ đường</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Detailed view modal overlay */}
+      {showDetails && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowDetails(false)}>
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="relative h-64">
+              <Image src={place.image} alt={place.name} fill className="object-cover" />
+              <button
+                onClick={() => setShowDetails(false)}
+                className="absolute top-4 right-4 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6">
+              <h2 className="text-2xl font-bold mb-2">{place.name}</h2>
+              <p className="text-gray-600 mb-4">{place.description || place.address}</p>
+              
+              {place.reviews && place.reviews.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="font-semibold mb-2">Đánh giá gần đây</h3>
+                  <div className="space-y-3">
+                    {place.reviews.slice(0, 3).map(review => (
+                      <div key={review.id} className="border rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                              <span className="text-sm font-semibold text-blue-800">
+                                {review.user.username[0].toUpperCase()}
+                              </span>
+                            </div>
+                            <span className="font-medium">{review.user.username}</span>
+                          </div>
+                          <div className="flex items-center">
+                            <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                            <span className="ml-1 text-sm">{review.rating}</span>
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-600">{review.comment}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
-// Get place type icon
-const getPlaceTypeIcon = (type: string) => {
-  return <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-    type === 'tourist_attraction' ? 'bg-green-100 text-green-600' :
-    type === 'restaurant' ? 'bg-red-100 text-red-600' :
-    type === 'cafe' ? 'bg-yellow-100 text-yellow-600' :
-    type === 'hotel' ? 'bg-blue-100 text-blue-600' :
-    'bg-purple-100 text-purple-600'
-  }`}>
-    {type === 'tourist_attraction' ? '🏛️' :
-     type === 'restaurant' ? '🍽️' :
-     type === 'cafe' ? '☕' :
-     type === 'hotel' ? '🏨' : '📍'}
-  </div>;
+// Weather card component
+const WeatherCard = ({ weather, date }: { weather?: WeatherData; date: string }) => {
+  if (!weather) {
+    return (
+      <div className="bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-100 rounded-xl p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-gray-600">Thời tiết hôm nay</p>
+            <p className="text-xs text-gray-500">{new Date(date).toLocaleDateString('vi-VN')}</p>
+          </div>
+          <div className="text-gray-400">
+            <Cloud className="w-8 h-8" />
+          </div>
+        </div>
+        <p className="text-xs text-gray-500 mt-2">Không có dữ liệu thời tiết</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-100 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <p className="text-sm font-medium text-gray-800">Thời tiết hôm nay</p>
+          <p className="text-xs text-gray-500">{new Date(date).toLocaleDateString('vi-VN')}</p>
+        </div>
+        {getWeatherIcon(weather.condition)}
+      </div>
+      
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center">
+            <Thermometer className="w-4 h-4 text-red-500 mr-1" />
+            <span className="text-sm font-semibold">{weather.temperatureHigh}°</span>
+            <span className="text-sm text-gray-500 ml-1">/ {weather.temperatureLow}°</span>
+          </div>
+        </div>
+        
+        <div className="flex items-center text-xs text-gray-600">
+          <Droplets className="w-3 h-3 mr-1" />
+          <span>{weather.precipitationChance}%</span>
+        </div>
+      </div>
+    </div>
+  );
 };
 
-export default function TripDetailsPage() {
+// Main component
+export default function ModernTripDetailsPage() {
   const router = useRouter();
   const params = useParams();
   const tripId = params.id as string;
@@ -208,44 +493,72 @@ export default function TripDetailsPage() {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeDay, setActiveDay] = useState(1);
-  const [showAddPlaceModal, setShowAddPlaceModal] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'timeline' | 'grid' | 'list'>('timeline');
   const [isEditing, setIsEditing] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState<string | null>(null);
-  
-  // Fetch trip data (simulated)
-// Thay thế useEffect fetch trip data
-useEffect(() => {
-  const loadTripData = async () => {
-    try {
-      const tripData = await TripService.getTripById(tripId);
-      setTrip(tripData);
-    } catch (error) {
-      console.error('Error loading trip:', error);
-      // Fallback về sample data hoặc hiển thị error
-      setTrip(null);
-    } finally {
-      setLoading(false);
+  const [showAddPlaceModal, setShowAddPlaceModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showOptimizerModal, setShowOptimizerModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // Load trip data
+  useEffect(() => {
+    const loadTripData = async () => {
+      try {
+        setLoading(true);
+        
+        // Use the enhanced trip service
+        const tripData = await fetch(`/api/trips/${tripId}`)
+          .then(response => {
+            if (!response.ok) throw new Error('Failed to fetch trip');
+            return response.json();
+          });
+        console.log(tripData);
+        // Load weather data for each day if city exists
+        if (tripData.city?.id) {
+          const daysWithWeather = await Promise.all(
+            tripData.days.map(async (day: any) => {
+              try {
+                const weatherResponse = await fetch(
+                  `/api/cities/${tripData.city!.id}/weather?date=${day.date}`
+                );
+                if (weatherResponse.ok) {
+                  const weatherData = await weatherResponse.json();
+                  return { ...day, weather: weatherData };
+                }
+                return day;
+              } catch (error) {
+                console.error('Failed to load weather for day:', day.dayNumber);
+                return day;
+              }
+            })
+          );
+          
+          setTrip({ ...tripData, days: daysWithWeather });
+        } else {
+          setTrip(tripData);
+        }
+      } catch (error) {
+        console.error('Error loading trip:', error);
+        setTrip(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (tripId) {
+      loadTripData();
     }
-  };
-  
-  loadTripData();
-}, [tripId]);
-  // Filter saved places based on search query
-  const filteredPlaces = savedPlaces.filter(place =>
-    place.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    place.address.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  
-  // Handle drag end
+  }, [tripId]);
+
+  // Handle drag and drop
   const handleDragEnd = (result: any) => {
     if (!result.destination || !trip) return;
     
     const { source, destination } = result;
     
-    // If the place is being reordered within the same day
     if (source.droppableId === destination.droppableId) {
+      // Reordering within same day
       const dayIndex = trip.days.findIndex(day => day.dayNumber === parseInt(source.droppableId));
       if (dayIndex === -1) return;
       
@@ -254,18 +567,11 @@ useEffect(() => {
       newPlaces.splice(destination.index, 0, removed);
       
       const newDays = [...trip.days];
-      newDays[dayIndex] = {
-        ...newDays[dayIndex],
-        places: newPlaces
-      };
+      newDays[dayIndex] = { ...newDays[dayIndex], places: newPlaces };
       
-      setTrip({
-        ...trip,
-        days: newDays
-      });
-    } 
-    // If the place is being moved to another day
-    else {
+      setTrip({ ...trip, days: newDays });
+    } else {
+      // Moving between days
       const sourceDayIndex = trip.days.findIndex(day => day.dayNumber === parseInt(source.droppableId));
       const destDayIndex = trip.days.findIndex(day => day.dayNumber === parseInt(destination.droppableId));
       
@@ -278,75 +584,15 @@ useEffect(() => {
       newDestPlaces.splice(destination.index, 0, removed);
       
       const newDays = [...trip.days];
-      newDays[sourceDayIndex] = {
-        ...newDays[sourceDayIndex],
-        places: newSourcePlaces
-      };
-      newDays[destDayIndex] = {
-        ...newDays[destDayIndex],
-        places: newDestPlaces
-      };
+      newDays[sourceDayIndex] = { ...newDays[sourceDayIndex], places: newSourcePlaces };
+      newDays[destDayIndex] = { ...newDays[destDayIndex], places: newDestPlaces };
       
-      setTrip({
-        ...trip,
-        days: newDays
-      });
+      setTrip({ ...trip, days: newDays });
     }
   };
-  
-  // Handle add place to day
-  const handleAddPlaceToDay = (place: Place, dayNumber: number) => {
-    if (!trip) return;
-    
-    const dayIndex = trip.days.findIndex(day => day.dayNumber === dayNumber);
-    if (dayIndex === -1) return;
-    
-    // Check if place already exists in this day
-    if (trip.days[dayIndex].places.some(p => p.id === place.id)) {
-      alert('Địa điểm này đã có trong lịch trình của ngày!');
-      return;
-    }
-    
-    const newDays = [...trip.days];
-    newDays[dayIndex] = {
-      ...newDays[dayIndex],
-      places: [...newDays[dayIndex].places, { ...place }]
-    };
-    
-    setTrip({
-      ...trip,
-      days: newDays
-    });
-    
-    setShowAddPlaceModal(false);
-  };
-  
-  // Handle remove place from day
-  const handleRemovePlaceFromDay = (placeId: string, dayNumber: number) => {
-    if (!trip) return;
-    
-    const dayIndex = trip.days.findIndex(day => day.dayNumber === dayNumber);
-    if (dayIndex === -1) return;
-    
-    const newDays = [...trip.days];
-    newDays[dayIndex] = {
-      ...newDays[dayIndex],
-      places: newDays[dayIndex].places.filter(p => p.id !== placeId)
-    };
-    
-    setTrip({
-      ...trip,
-      days: newDays
-    });
-  };
-  
-  // Handle update place time
-  const handleUpdatePlaceTime = (
-    placeId: string, 
-    dayNumber: number, 
-    field: 'startTime' | 'endTime' | 'duration' | 'notes', 
-    value: string | number
-  ) => {
+
+  // Handle place updates
+  const handleUpdatePlace = (placeId: string, dayNumber: number, field: string, value: any) => {
     if (!trip) return;
     
     const dayIndex = trip.days.findIndex(day => day.dayNumber === dayNumber);
@@ -363,102 +609,172 @@ useEffect(() => {
       )
     };
     
-    setTrip({
-      ...trip,
-      days: newDays
-    });
+    setTrip({ ...trip, days: newDays });
   };
-  
-  // Calculate total duration for a day
-  const calculateDayDuration = (places: Place[]): number => {
-    return places.reduce((total, place) => total + (place.duration || 0), 0);
+
+  // Handle remove place
+  const handleRemovePlace = (placeId: string, dayNumber: number) => {
+    if (!trip) return;
+    
+    const dayIndex = trip.days.findIndex(day => day.dayNumber === dayNumber);
+    if (dayIndex === -1) return;
+    
+    const newDays = [...trip.days];
+    newDays[dayIndex] = {
+      ...newDays[dayIndex],
+      places: newDays[dayIndex].places.filter(p => p.id !== placeId)
+    };
+    
+    setTrip({ ...trip, days: newDays });
   };
-  
-  // Handle save itinerary
-const handleSaveItinerary = async () => {
-  if (!trip) return;
-  
-  try {
-    await TripService.updateTrip(trip.id, trip);
-    alert('Lịch trình đã được lưu thành công!');
-    setIsEditing(false);
-  } catch (error) {
-    console.error('Error saving trip:', error);
-    alert('Có lỗi xảy ra khi lưu lịch trình');
-  }
-};
-  
+
+  // Handle save
+  const handleSave = async () => {
+    if (!trip) return;
+    
+    try {
+      setSaving(true);
+      const response = await fetch(`/api/trips/${tripId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(trip)
+      });
+      
+      if (!response.ok) throw new Error('Failed to save trip');
+      
+      setIsEditing(false);
+      // Show success message
+    } catch (error) {
+      console.error('Error saving trip:', error);
+      // Show error message
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Đang tải dữ liệu...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
-  
+
   if (!trip) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6 bg-white rounded-xl shadow-sm">
-          <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6 bg-white rounded-2xl shadow-sm">
+          <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-800 mb-2">Không tìm thấy lịch trình</h2>
           <p className="text-gray-600 mb-6">Lịch trình bạn đang tìm kiếm không tồn tại hoặc đã bị xóa.</p>
           <Link
             href="/trip-planner"
-            className="inline-flex items-center py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center py-3 px-6 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-medium"
           >
-            <ChevronLeft className="w-5 h-5 mr-1" />
+            <ChevronLeft className="w-5 h-5 mr-2" />
             <span>Quay lại danh sách</span>
           </Link>
         </div>
       </div>
     );
   }
-  
+
+  const currentDay = trip.days.find(day => day.dayNumber === activeDay);
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+      {/* Modern Header */}
+      <header className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center">
-              <Link href="/trip-planner" className="mr-4">
-                <ChevronLeft className="h-6 w-6 text-gray-500" />
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center space-x-4 mb-4 lg:mb-0">
+              <Link href="/trip-planner" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+                <ChevronLeft className="h-5 w-5 text-gray-600" />
               </Link>
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">{trip.name}</h1>
-                <p className="text-gray-600">{trip.destination}</p>
+                <h1 className="text-2xl font-bold text-gray-900">{trip.name}</h1>
+                <div className="flex items-center space-x-4 text-sm text-gray-600">
+                  <div className="flex items-center">
+                    <MapPin className="w-4 h-4 mr-1" />
+                    <span>{trip.destination}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Calendar className="w-4 h-4 mr-1" />
+                    <span>{new Date(trip.startDate).toLocaleDateString('vi-VN')} - {new Date(trip.endDate).toLocaleDateString('vi-VN')}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Clock className="w-4 h-4 mr-1" />
+                    <span>{trip.numDays} ngày</span>
+                  </div>
+                </div>
               </div>
             </div>
             
-            <div className="mt-4 md:mt-0 flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
+              {/* View mode selector */}
+              <div className="flex bg-gray-100 rounded-xl p-1">
+                <button
+                  onClick={() => setViewMode('timeline')}
+                  className={`p-2 rounded-lg transition-all ${viewMode === 'timeline' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
+                >
+                  <Route className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
+                >
+                  <Grid className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
+                >
+                  <List className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Action buttons */}
               <button
-                onClick={() => setShowExportModal(true)}
-                className="flex items-center py-2 px-4 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                onClick={() => setShowOptimizerModal(true)}
+                className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+                title="Tối ưu hóa lịch trình"
               >
-                <Download className="w-5 h-5 mr-2" />
-                <span>Xuất lịch trình</span>
+                <Sparkles className="w-5 h-5" />
               </button>
               
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+              >
+                <Share className="w-5 h-5" />
+              </button>
+              
+              <Link
+                href={`/trip-planner/${tripId}/print`}
+                className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+              >
+                <Download className="w-5 h-5" />
+              </Link>
+              
               {isEditing ? (
-                <button
-                  onClick={handleSaveItinerary}
-                  className="flex items-center py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Save className="w-5 h-5 mr-2" />
-                  <span>Lưu thay đổi</span>
-                </button>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setIsEditing(false)}
+                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center space-x-2 disabled:opacity-50"
+                  >
+                    {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    <span>{saving ? 'Đang lưu...' : 'Lưu'}</span>
+                  </button>
+                </div>
               ) : (
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="flex items-center py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center space-x-2"
                 >
-                  <Edit className="w-5 h-5 mr-2" />
+                  <Edit className="w-4 h-4" />
                   <span>Chỉnh sửa</span>
                 </button>
               )}
@@ -466,472 +782,306 @@ const handleSaveItinerary = async () => {
           </div>
         </div>
       </header>
-      
-      {/* Trip info */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
-          <div className="md:flex">
-            <div className="md:flex-shrink-0 relative h-48 md:h-auto md:w-1/3">
-              <Image
-                src={trip.city?.imageUrl || trip.coverImage || '/images/default-trip.jpg'}
-                alt={trip.name}
-                fill
-                className="object-cover"
-              />
-            </div>
-            <div className="p-6 md:p-8">
-              <div className="flex items-center text-sm text-gray-500 mb-2">
-                <Calendar className="w-4 h-4 mr-1.5" />
-                <span>{formatDate(trip.startDate)} - {formatDate(trip.endDate)}</span>
-              </div>
-              <div className="flex items-center text-sm text-gray-500 mb-4">
-                <Clock className="w-4 h-4 mr-1.5" />
-                <span>{trip.numDays} ngày</span>
-                <span className="mx-2">•</span>
-                <MapPin className="w-4 h-4 mr-1.5" />
-                <span>
-                  {trip.days.reduce((total, day) => total + day.places.length, 0)} địa điểm
-                </span>
-              </div>
-              
+
+      {/* Trip Hero Section */}
+      {trip.city?.imageUrl && (
+        <div className="relative h-64 lg:h-80 overflow-hidden">
+          <Image
+            src={trip.city.imageUrl}
+            alt={trip.destination}
+            fill
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+          <div className="absolute bottom-6 left-6 right-6">
+            <div className="max-w-7xl mx-auto">
+              <h2 className="text-3xl lg:text-4xl font-bold text-white mb-2">{trip.destination}</h2>
               {trip.description && (
-                <div className="text-gray-600 mb-6 max-w-3xl">
-                  {trip.description}
-                </div>
+                <p className="text-white/90 text-lg max-w-2xl">{trip.description}</p>
               )}
-              
-              <div className="flex flex-wrap gap-2">
-                <div className="bg-blue-100 text-blue-800 rounded-full px-3 py-1 text-sm font-medium">
-                  {trip.status === 'draft' ? 'Bản nháp' : 
-                   trip.status === 'planned' ? 'Đã lên kế hoạch' : 'Đã hoàn thành'}
+              <div className="flex items-center space-x-6 mt-4">
+                <div className="flex items-center text-white/80">
+                  <Users className="w-5 h-5 mr-2" />
+                  <span>{trip.travelCompanions || 1} người</span>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Itinerary content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-16">
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Days tabs sidebar */}
-          <div className="lg:w-64 flex-shrink-0">
-            <div className="bg-white rounded-xl shadow-sm p-4 mb-4">
-              <h2 className="font-bold text-gray-800 mb-4">Lịch trình theo ngày</h2>
-              <nav className="space-y-1">
-                {trip.days.map(day => (
-                  <button
-                    key={day.dayNumber}
-                    className={`flex items-center justify-between w-full px-4 py-3 text-left text-sm rounded-lg transition-colors ${
-                      activeDay === day.dayNumber
-                        ? 'bg-blue-50 text-blue-700 font-medium'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                    onClick={() => setActiveDay(day.dayNumber)}
-                  >
-                    <div className="flex flex-col">
-                      <span>Ngày {day.dayNumber}</span>
-                      <span className="text-xs text-gray-500">
-                        {formatDate(day.date).split(', ')[0]}
-                      </span>
-                    </div>
-                    <span className="bg-gray-100 text-gray-700 text-xs rounded-full py-1 px-2">
-                      {day.places.length} địa điểm
-                    </span>
-                  </button>
-                ))}
-              </nav>
-            </div>
-            
-            <div className="bg-white rounded-xl shadow-sm p-4">
-              <h2 className="font-bold text-gray-800 mb-2">Tổng quan</h2>
-              <div className="text-sm text-gray-600 space-y-2">
-                <p>
-                  <span className="font-medium">Tổng số ngày:</span> {trip.numDays}
-                </p>
-                <p>
-                  <span className="font-medium">Tổng số địa điểm:</span> {trip.days.reduce((total, day) => total + day.places.length, 0)}
-                </p>
-                <p>
-                  <span className="font-medium">Địa điểm/ngày:</span> {(trip.days.reduce((total, day) => total + day.places.length, 0) / trip.numDays).toFixed(1)}
-                </p>
-                <p>
-                  <span className="font-medium">Tổng thời gian:</span> {formatTime(trip.days.reduce((total, day) => total + calculateDayDuration(day.places), 0))}
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          {/* Day content */}
-          <div className="flex-grow">
-            {trip.days.map(day => (
-              <div key={day.dayNumber} className={activeDay === day.dayNumber ? '' : 'hidden'}>
-                <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
-                  <div className="bg-blue-600 text-white p-4">
-                    <div className="flex justify-between items-center">
-                      <h2 className="font-bold text-xl">Ngày {day.dayNumber}: {formatDate(day.date)}</h2>
-                      {day.places.length > 0 && (
-                        <div className="text-sm bg-white/20 rounded-full px-3 py-1">
-                          {calculateDayDuration(day.places) > 0 
-                            ? formatTime(calculateDayDuration(day.places)) 
-                            : `${day.places.length} địa điểm`}
-                        </div>
-                      )}
-                    </div>
+                {trip.estimatedBudget && (
+                  <div className="flex items-center text-white/80">
+                    <DollarSign className="w-5 h-5 mr-2" />
+                    <span>{trip.estimatedBudget.toLocaleString('vi-VN')} VNĐ</span>
                   </div>
-                  
-                  <div className="p-4">
-                    {day.places.length === 0 ? (
-                      <div className="text-center py-8">
-                        <Calendar className="w-12 h-12 mx-auto text-gray-300 mb-3" />
-                        <p className="text-gray-500 mb-4">Chưa có địa điểm nào cho ngày này</p>
-                        <button
-                          onClick={() => setShowAddPlaceModal(true)}
-                          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                          <Plus className="w-5 h-5 mr-1" />
-                          <span>Thêm địa điểm</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <DragDropContext onDragEnd={handleDragEnd}>
-                        <Droppable droppableId={day.dayNumber.toString()}  isDropDisabled={true} isCombineEnabled={true}  >
-                          {(provided) => (
-                            <div
-                              {...provided.droppableProps}
-                              ref={provided.innerRef}
-                              className="space-y-4"
-                            >
-                              {day.places.map((place, index) => (
-                                <Draggable
-                                  key={place.id}
-                                  draggableId={place.id}
-                                  index={index}
-                                  isDragDisabled={!isEditing}
-                                >
-                                  {(provided) => (
-                                    <div
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
-                                      className={`border rounded-lg overflow-hidden transition-shadow ${isEditing ? 'hover:shadow-md' : ''}`}
-                                    >
-                                      <div className="flex">
-                                        <div className="relative h-32 w-32 flex-shrink-0">
-                                          <Image
-                                            src={place.image}
-                                            alt={place.name}
-                                            fill
-                                            className="object-cover"
-                                          />
-                                        </div>
-                                        <div className="p-3 flex-grow">
-                                          <div className="flex justify-between">
-                                            <div className="flex items-start gap-2">
-                                              {isEditing && (
-                                                <div
-                                                  {...provided.dragHandleProps}
-                                                  className="cursor-move text-gray-400 p-1"
-                                                >
-                                                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                                                  </svg>
-                                                </div>
-                                              )}
-                                              {getPlaceTypeIcon(place.type)}
-                                              <div>
-                                                <h3 className="font-medium text-gray-800">{place.name}</h3>
-                                                <p className="text-sm text-gray-500">{place.address}</p>
-                                              </div>
-                                            </div>
-                                            {isEditing && (
-                                              <button
-                                                onClick={() => handleRemovePlaceFromDay(place.id, day.dayNumber)}
-                                                className="text-red-500 hover:text-red-700"
-                                              >
-                                                <Trash2 className="w-5 h-5" />
-                                              </button>
-                                            )}
-                                          </div>
-                                          
-                                          <div className="mt-3 border-t pt-3">
-                                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-                                              {/* Time slots */}
-                                              <div className="flex items-center gap-1 min-w-[150px]">
-                                                <Clock className="w-4 h-4 text-gray-500" />
-                                                {isEditing ? (
-                                                  showTimePicker === `${place.id}-start` ? (
-                                                    <input
-                                                      type="time"
-                                                      value={place.startTime || ''}
-                                                      onChange={(e) => handleUpdatePlaceTime(place.id, day.dayNumber, 'startTime', e.target.value)}
-                                                      onBlur={() => setShowTimePicker(null)}
-                                                      className="border rounded px-2 py-1 w-24"
-                                                      autoFocus
-                                                    />
-                                                  ) : (
-                                                    <button
-                                                      onClick={() => setShowTimePicker(`${place.id}-start`)}
-                                                      className="text-gray-600 hover:text-blue-600"
-                                                    >
-                                                      {place.startTime || 'Thêm giờ'}
-                                                    </button>
-                                                  )
-                                                ) : (
-                                                  place.startTime && <span>{place.startTime}</span>
-                                                )}
-                                                
-                                                {(place.startTime || isEditing) && (
-                                                  <span className="mx-1">-</span>
-                                                )}
-                                                
-                                                {isEditing ? (
-                                                  showTimePicker === `${place.id}-end` ? (
-                                                    <input
-                                                      type="time"
-                                                      value={place.endTime || ''}
-                                                      onChange={(e) => handleUpdatePlaceTime(place.id, day.dayNumber, 'endTime', e.target.value)}
-                                                      onBlur={() => setShowTimePicker(null)}
-                                                      className="border rounded px-2 py-1 w-24"
-                                                      autoFocus
-                                                    />
-                                                  ) : (
-                                                    <button
-                                                      onClick={() => setShowTimePicker(`${place.id}-end`)}
-                                                      className="text-gray-600 hover:text-blue-600"
-                                                    >
-                                                      {place.endTime || 'Thêm giờ'}
-                                                    </button>
-                                                  )
-                                                ) : (
-                                                  place.endTime && <span>{place.endTime}</span>
-                                                )}
-                                              </div>
-                                              
-                                              {/* Duration */}
-                                              <div className="flex items-center gap-1">
-                                                <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                                {isEditing ? (
-                                                  <div className="flex items-center gap-1">
-                                                    <input
-                                                      type="number"
-                                                      min="15"
-                                                      max="480"
-                                                      step="15"
-                                                      value={place.duration || ''}
-                                                      onChange={(e) => handleUpdatePlaceTime(place.id, day.dayNumber, 'duration', parseInt(e.target.value) || 0)}
-                                                      className="border rounded px-2 py-1 w-16"
-                                                    />
-                                                    <span className="text-gray-500">phút</span>
-                                                  </div>
-                                                ) : (
-                                                  <span>
-                                                    {place.duration ? formatTime(place.duration) : 'Chưa cập nhật'}
-                                                  </span>
-                                                )}
-                                              </div>
-                                              
-                                              {/* Opening hours */}
-                                              {place.openingHours && (
-                                                <div className="flex items-center gap-1">
-                                                  <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                  </svg>
-                                                  <span>Mở cửa: {place.openingHours}</span>
-                                                </div>
-                                              )}
-                                            </div>
-                                            
-                                            {/* Notes */}
-                                            {(isEditing || place.notes) && (
-                                              <div className="mt-2">
-                                                {isEditing ? (
-                                                  <textarea
-                                                    placeholder="Ghi chú (không bắt buộc)"
-                                                    value={place.notes || ''}
-                                                    onChange={(e) => handleUpdatePlaceTime(place.id, day.dayNumber, 'notes', e.target.value)}
-                                                    className="w-full border rounded px-3 py-2 text-sm"
-                                                    rows={2}
-                                                  />
-                                                ) : place.notes && (
-                                                  <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                                                    {place.notes}
-                                                  </div>
-                                                )}
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-                                </Draggable>
-                              ))}
-                              {provided.placeholder}
-                              
-                              {isEditing && (
-                                <div className="text-center py-4">
-                                  <button
-                                    onClick={() => setShowAddPlaceModal(true)}
-                                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                  >
-                                    <Plus className="w-5 h-5 mr-1" />
-                                    <span>Thêm địa điểm</span>
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </Droppable>
-                      </DragDropContext>
-                    )}
-                  </div>
+                )}
+                <div className="flex items-center text-white/80">
+                  <Sparkles className="w-5 h-5 mr-2" />
+                  <span className="capitalize">{trip.status === 'draft' ? 'Bản nháp' : trip.status === 'planned' ? 'Đã lên kế hoạch' : 'Đã hoàn thành'}</span>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-      
-      {/* Add place modal */}
-      {showAddPlaceModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl w-full max-w-3xl max-h-[80vh] flex flex-col">
-            <div className="p-4 border-b">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-800">Thêm địa điểm vào Ngày {activeDay}</h2>
-                <button 
-                  className="text-gray-400 hover:text-gray-600"
-                  onClick={() => setShowAddPlaceModal(false)}
-                >
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              
-              {/* Search input */}
-              <div className="relative mt-4">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Tìm kiếm địa điểm..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-                <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-            </div>
-            
-            <div className="flex-grow overflow-y-auto p-4">
-              {filteredPlaces.length === 0 ? (
-                <div className="text-center py-8">
-                  <svg className="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <p className="text-gray-500">Không tìm thấy địa điểm nào phù hợp</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {filteredPlaces.map(place => (
-                    <div 
-                      key={place.id} 
-                      className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
-                      onClick={() => handleAddPlaceToDay(place, activeDay)}
-                    >
-                      <div className="flex">
-                        <div className="relative h-24 w-24 flex-shrink-0">
-                          <Image
-                            src={place.image}
-                            alt={place.name}
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                        <div className="p-3 flex-grow">
-                          <div className="flex items-start gap-2">
-                            {getPlaceTypeIcon(place.type)}
-                            <div>
-                              <h3 className="font-medium text-gray-800">{place.name}</h3>
-                              <p className="text-xs text-gray-500 line-clamp-2">{place.address}</p>
-                              {place.openingHours && (
-                                <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-                                  <Clock className="w-3 h-3" />
-                                  <span>{place.openingHours}</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            
-            <div className="p-4 border-t">
-              <div className="flex justify-end">
-                <button
-                  onClick={() => setShowAddPlaceModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  Đóng
-                </button>
               </div>
             </div>
           </div>
         </div>
       )}
-      
-      {/* Export modal */}
-      {showExportModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl w-full max-w-md">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-800">Xuất lịch trình</h2>
-                <button 
-                  className="text-gray-400 hover:text-gray-600"
-                  onClick={() => setShowExportModal(false)}
-                >
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Sidebar */}
+          <div className="lg:w-80 space-y-6">
+            {/* Days Navigation */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="p-4 border-b border-gray-100">
+                <h3 className="font-bold text-gray-900 flex items-center">
+                  <Calendar className="w-5 h-5 mr-2 text-blue-600" />
+                  Lịch trình theo ngày
+                </h3>
               </div>
-              
+              <div className="p-2">
+                {trip.days.map(day => (
+                  <button
+                    key={day.dayNumber}
+                    className={`w-full flex items-center justify-between p-3 text-left text-sm rounded-xl transition-all mb-2 ${
+                      activeDay === day.dayNumber
+                        ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-200'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                    onClick={() => setActiveDay(day.dayNumber)}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                        activeDay === day.dayNumber ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {day.dayNumber}
+                      </div>
+                      <div>
+                        <div className="font-medium">Ngày {day.dayNumber}</div>
+                        <div className="text-xs text-gray-500">
+                          {new Date(day.date).toLocaleDateString('vi-VN', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="bg-gray-100 text-gray-700 text-xs rounded-full py-1 px-2">
+                        {day.places.length}
+                      </span>
+                      {day.weather && (
+                        <div className="flex items-center">
+                          {getWeatherIcon(day.weather.condition)}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Weather for active day */}
+            {currentDay && (
+              <WeatherCard weather={currentDay.weather} date={currentDay.date} />
+            )}
+
+            {/* Trip Statistics */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <h3 className="font-bold text-gray-900 mb-4 flex items-center">
+                <TrendingUp className="w-5 h-5 mr-2 text-green-600" />
+                Thống kê chuyến đi
+              </h3>
               <div className="space-y-4">
-                <button className="flex items-center w-full p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                  <Download className="w-6 h-6 text-blue-600 mr-4" />
-                  <div className="text-left">
-                    <h3 className="font-medium text-gray-800">Tải xuống PDF</h3>
-                    <p className="text-sm text-gray-500">Tải lịch trình dưới dạng file PDF</p>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Tổng số ngày</span>
+                  <span className="font-semibold">{trip.numDays}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Số địa điểm</span>
+                  <span className="font-semibold">{trip.days.reduce((sum, day) => sum + day.places.length, 0)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Trung bình/ngày</span>
+                  <span className="font-semibold">{(trip.days.reduce((sum, day) => sum + day.places.length, 0) / trip.numDays).toFixed(1)}</span>
+                </div>
+                {trip.estimatedBudget && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Ngân sách</span>
+                    <span className="font-semibold">{trip.estimatedBudget.toLocaleString('vi-VN')} VNĐ</span>
                   </div>
-                </button>
-                
-                <button className="flex items-center w-full p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                  <Share className="w-6 h-6 text-green-600 mr-4" />
-                  <div className="text-left">
-                    <h3 className="font-medium text-gray-800">Chia sẻ liên kết</h3>
-                    <p className="text-sm text-gray-500">Chia sẻ lịch trình qua liên kết</p>
-                  </div>
-                </button>
-                
-                <button className="flex items-center w-full p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                  <Printer className="w-6 h-6 text-purple-600 mr-4" />
-                  <div className="text-left">
-                    <h3 className="font-medium text-gray-800">In lịch trình</h3>
-                    <p className="text-sm text-gray-500">In lịch trình để mang theo</p>
-                  </div>
-                </button>
+                )}
               </div>
             </div>
           </div>
+
+          {/* Main Content Area */}
+          <div className="flex-1">
+            {currentDay && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                {/* Day Header */}
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h2 className="text-2xl font-bold">Ngày {currentDay.dayNumber}</h2>
+                      <p className="text-blue-100">{new Date(currentDay.date).toLocaleDateString('vi-VN', { 
+                        weekday: 'long', 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold">{currentDay.places.length}</div>
+                      <div className="text-sm text-blue-100">địa điểm</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Places Content */}
+                <div className="p-6">
+                  {currentDay.places.length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <MapPin className="w-12 h-12 text-gray-400" />
+                      </div>
+                      <h3 className="text-xl font-semibold text-gray-800 mb-2">Chưa có địa điểm nào</h3>
+                      <p className="text-gray-600 mb-6">Thêm địa điểm để bắt đầu lên kế hoạch cho ngày này</p>
+                      <button
+                        onClick={() => setShowAddPlaceModal(true)}
+                        className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-medium"
+                      >
+                        <Plus className="w-5 h-5 mr-2" />
+                        <span>Thêm địa điểm</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <DragDropContext onDragEnd={handleDragEnd}>
+                      <Droppable droppableId={currentDay.dayNumber.toString()}>
+                        {(provided) => (
+                          <div
+                            {...provided.droppableProps}
+                            ref={provided.innerRef}
+                            className={`space-y-6 ${
+                              viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-6 space-y-0' : 
+                              viewMode === 'list' ? 'space-y-3' : 'space-y-6'
+                            }`}
+                          >
+                            {currentDay.places.map((place, index) => (
+                              <Draggable
+                                key={place.id}
+                                draggableId={place.id}
+                                index={index}
+                                isDragDisabled={!isEditing}
+                              >
+                                {(provided, snapshot) => (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    className={`transition-all duration-200 ${
+                                      snapshot.isDragging ? 'scale-105 shadow-xl' : ''
+                                    }`}
+                                  >
+                                    <PlaceCard
+                                      place={place}
+                                      dayNumber={currentDay.dayNumber}
+                                      isEditing={isEditing}
+                                      onUpdate={handleUpdatePlace}
+                                      onRemove={handleRemovePlace}
+                                    />
+                                  </div>
+                                )}
+                              </Draggable>
+                            ))}
+                            {provided.placeholder}
+                            
+                            {isEditing && (
+                              <div className="flex justify-center pt-6">
+                                <button
+                                  onClick={() => setShowAddPlaceModal(true)}
+                                  className="inline-flex items-center px-6 py-3 bg-dashed border-2 border-dashed border-gray-300 text-gray-600 rounded-xl hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200"
+                                >
+                                  <Plus className="w-5 h-5 mr-2" />
+                                  <span>Thêm địa điểm mới</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </Droppable>
+                    </DragDropContext>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
+      </div>
+
+      {/* Add Place Modal */}
+      {showAddPlaceModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-4xl max-h-[90vh]">
+            <EnhancedPlaceSearchPanel
+              onAddPlace={(place, dayNumber) => {
+                // Find the day and add the place
+                const dayIndex = trip!.days.findIndex(day => day.dayNumber === dayNumber);
+                if (dayIndex !== -1) {
+                  const newDays = [...trip!.days];
+                  newDays[dayIndex] = {
+                    ...newDays[dayIndex],
+                    places: [...newDays[dayIndex].places, place]
+                  };
+                  setTrip({ ...trip!, days: newDays });
+                }
+                setShowAddPlaceModal(false);
+              }}
+              currentDayNumber={activeDay}
+              allDays={trip.days.map(day => day.dayNumber)}
+              cityId={trip.city?.id}
+              onClose={() => setShowAddPlaceModal(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-900">Chia sẻ lịch trình</h2>
+              <button 
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+                onClick={() => setShowShareModal(false)}
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <button className="w-full flex items-center p-4 border rounded-xl hover:bg-gray-50 transition-colors">
+                <Share className="w-6 h-6 text-blue-600 mr-4" />
+                <div className="text-left">
+                  <h3 className="font-medium text-gray-900">Sao chép liên kết</h3>
+                  <p className="text-sm text-gray-500">Chia sẻ qua liên kết công khai</p>
+                </div>
+              </button>
+              
+              <button className="w-full flex items-center p-4 border rounded-xl hover:bg-gray-50 transition-colors">
+                <Download className="w-6 h-6 text-green-600 mr-4" />
+                <div className="text-left">
+                  <h3 className="font-medium text-gray-900">Tải xuống PDF</h3>
+                  <p className="text-sm text-gray-500">Lưu lịch trình dưới dạng PDF</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Trip Optimizer Modal */}
+      {showOptimizerModal && trip && (
+        <EnhancedTripOptimizer
+          trip={trip}
+          onUpdateTrip={(updatedTrip) => {
+            setTrip(updatedTrip);
+            setShowOptimizerModal(false);
+          }}
+          onClose={() => setShowOptimizerModal(false)}
+        />
       )}
     </div>
   );

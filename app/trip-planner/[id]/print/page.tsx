@@ -1,3 +1,4 @@
+// app/trip-planner/[id]/print/page.tsx
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -6,30 +7,92 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { 
   ChevronLeft, Download, Printer, QrCode, Share, 
-  Calendar, Clock, MapPin, ArrowLeft, ArrowRight
+  Calendar, Clock, MapPin, ArrowLeft, ArrowRight,
+  Star, Navigation, Globe, Camera, ExternalLink,
+  Users, DollarSign, Thermometer, Cloud, Sun, CloudRain,
+  Coffee, Utensils, Building, Landmark, Zap, Target,
+  Award, Activity, TrendingUp, BarChart3, LineChart,
+  Info, AlertCircle, CheckCircle2, RefreshCw, Eye
 } from 'lucide-react';
-import ItineraryTimeline from '../../components/ItineraryTimeline';
 
-// Type definitions (same as in ItineraryTimeline.tsx)
+// Enhanced interfaces with database fields
+interface Photo {
+  id: number;
+  url: string;
+  caption?: string;
+  isPrimary: boolean;
+}
+
+interface Review {
+  id: number;
+  rating: number;
+  comment: string;
+  visitDate: string;
+  createdAt: string;
+  user: {
+    id: number;
+    username: string;
+    avatarUrl?: string;
+  };
+}
+
+interface Category {
+  id: number;
+  name: string;
+  icon: string;
+  description?: string;
+}
+
+interface City {
+  id: number;
+  name: string;
+  country: string;
+  description?: string;
+  imageUrl?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+interface WeatherData {
+  id: number;
+  date: string;
+  temperatureHigh: number;
+  temperatureLow: number;
+  condition: string;
+  precipitationChance: number;
+}
+
 interface Place {
   id: string;
   name: string;
   type: string;
   address: string;
-  image: string;
   latitude: string;
   longitude: string;
+  image: string;
   startTime?: string;
   endTime?: string;
-  duration?: number; // in minutes
+  duration?: number;
   notes?: string;
   openingHours?: string;
+  rating?: number;
+  category?: Category;
+  city?: City;
+  photos?: Photo[];
+  reviews?: Review[];
+  website?: string;
+  contactInfo?: string;
+  priceLevel?: number;
+  avgDurationMinutes?: number;
+  description?: string;
 }
 
 interface Day {
   dayNumber: number;
   date: string;
   places: Place[];
+  weather?: WeatherData;
+  notes?: string;
 }
 
 interface Trip {
@@ -43,164 +106,136 @@ interface Trip {
   days: Day[];
   status: 'draft' | 'planned' | 'completed';
   description?: string;
+  city?: City;
+  user?: {
+    id: number;
+    username: string;
+    fullName?: string;
+  };
+  tags?: string[];
+  estimatedBudget?: number;
+  travelCompanions?: number;
 }
 
-// Dummy place data (same as in the trip detail page)
-const savedPlaces: Place[] = [
-  {
-    id: 'place1',
-    name: 'Hồ Hoàn Kiếm',
-    type: 'tourist_attraction',
-    address: 'Phố Đinh Tiên Hoàng, Quận Hoàn Kiếm, Hà Nội',
-    latitude: '21.0278',
-    longitude: '105.8523',
-    image: '/images/place-3.jpg',
-    openingHours: '6:00 - 20:00',
-    duration: 90
-  },
-  {
-    id: 'place2',
-    name: 'Văn Miếu - Quốc Tử Giám',
-    type: 'tourist_attraction',
-    address: '58 Phố Quốc Tử Giám, Quận Đống Đa, Hà Nội',
-    latitude: '21.0274',
-    longitude: '105.8354',
-    image: '/images/place-1.jpg',
-    openingHours: '8:00 - 17:00',
-    duration: 120
-  },
-  {
-    id: 'place3',
-    name: 'Chùa Trấn Quốc',
-    type: 'tourist_attraction',
-    address: 'Thanh Niên, Quận Tây Hồ, Hà Nội',
-    latitude: '21.0492',
-    longitude: '105.8350',
-    image: '/images/pagoda-1.jpg',
-    openingHours: '7:30 - 18:00',
-    duration: 60
-  },
-  {
-    id: 'place4',
-    name: 'Nhà hàng Chả Cá Lã Vọng',
-    type: 'restaurant',
-    address: '14 Chả Cá, Quận Hoàn Kiếm, Hà Nội',
-    latitude: '21.0323',
-    longitude: '105.8508',
-    image: '/images/restaurant-1.jpg',
-    openingHours: '10:00 - 22:00',
-    duration: 90
-  },
-  {
-    id: 'place5',
-    name: 'Lăng Chủ tịch Hồ Chí Minh',
-    type: 'tourist_attraction',
-    address: '2 Hùng Vương, Điện Bàn, Ba Đình, Hà Nội',
-    latitude: '21.0369',
-    longitude: '105.8353',
-    image: '/images/place-2.jpg',
-    openingHours: '7:30 - 10:30, 14:00 - 16:00',
-    duration: 60
-  },
-  {
-    id: 'place6',
-    name: 'Phố cổ Hà Nội',
-    type: 'tourist_attraction',
-    address: 'Quận Hoàn Kiếm, Hà Nội',
-    latitude: '21.0340',
-    longitude: '105.8500',
-    image: '/images/place-4.jpg',
-    openingHours: '24/7',
-    duration: 180
-  },
-  {
-    id: 'place7',
-    name: 'Bảo tàng Lịch sử Quốc gia',
-    type: 'tourist_attraction',
-    address: '1 Tràng Tiền, Quận Hoàn Kiếm, Hà Nội',
-    latitude: '21.0243',
-    longitude: '105.8583',
-    image: '/images/museum-1.jpg',
-    openingHours: '8:00 - 17:00',
-    duration: 120
-  },
-  {
-    id: 'place8',
-    name: 'Highlands Coffee - Nhà hát Lớn',
-    type: 'cafe',
-    address: '1 Tràng Tiền, Quận Hoàn Kiếm, Hà Nội',
-    latitude: '21.0244',
-    longitude: '105.8573',
-    image: '/images/cafe-1.jpg',
-    openingHours: '7:00 - 22:00',
-    duration: 60
+// Weather icon mapping
+const getWeatherIcon = (condition: string) => {
+  switch (condition) {
+    case 'sunny': return <Sun className="w-5 h-5 text-yellow-500" />;
+    case 'cloudy': return <Cloud className="w-5 h-5 text-gray-500" />;
+    case 'rain': return <CloudRain className="w-5 h-5 text-blue-500" />;
+    default: return <Sun className="w-5 h-5 text-yellow-500" />;
   }
-];
-
-// Sample trip data
-const sampleTrip: Trip = {
-  id: 'trip1',
-  name: 'Khám phá Hà Nội',
-  destination: 'Hà Nội',
-  startDate: '2025-04-20',
-  endDate: '2025-04-23',
-  coverImage: '/images/ha-noi.jpg',
-  numDays: 4,
-  status: 'planned',
-  description: 'Khám phá các địa điểm nổi tiếng và ẩm thực đặc sắc của thủ đô nghìn năm văn hiến.',
-  days: [
-    {
-      dayNumber: 1,
-      date: '2025-04-20',
-      places: [savedPlaces[0], savedPlaces[3]]
-    },
-    {
-      dayNumber: 2,
-      date: '2025-04-21',
-      places: [savedPlaces[1], savedPlaces[7]]
-    },
-    {
-      dayNumber: 3,
-      date: '2025-04-22',
-      places: [savedPlaces[4], savedPlaces[2]]
-    },
-    {
-      dayNumber: 4,
-      date: '2025-04-23',
-      places: [savedPlaces[5]]
-    }
-  ]
 };
 
-// Format date
+// Place type configuration
+const placeTypeConfig = {
+  tourist_attraction: { icon: Landmark, color: 'text-green-600', label: 'Điểm tham quan', emoji: '🏛️' },
+  restaurant: { icon: Utensils, color: 'text-red-600', label: 'Nhà hàng', emoji: '🍽️' },
+  cafe: { icon: Coffee, color: 'text-amber-600', label: 'Quán cà phê', emoji: '☕' },
+  hotel: { icon: Building, color: 'text-blue-600', label: 'Khách sạn', emoji: '🏨' },
+  shopping: { icon: Activity, color: 'text-purple-600', label: 'Mua sắm', emoji: '🛍️' }
+};
+
+// Enhanced formatting functions
 const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
   return new Intl.DateTimeFormat('vi-VN', {
     weekday: 'long',
-    day: 'numeric',
+    day: '2-digit',
     month: 'long',
     year: 'numeric'
   }).format(date);
 };
 
-export default function TripPrintPage() {
+const formatShortDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }).format(date);
+};
+
+const formatDuration = (minutes: number): string => {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours > 0 ? `${hours}h ` : ''}${mins > 0 ? `${mins}m` : ''}`;
+};
+
+// Price level indicator
+const getPriceLevelIndicator = (level?: number) => {
+  if (!level) return null;
+  return (
+    <div className="flex items-center">
+      {Array.from({ length: 4 }, (_, i) => (
+        <DollarSign
+          key={i}
+          className={`w-3 h-3 ${i < level ? 'text-green-600' : 'text-gray-300'}`}
+        />
+      ))}
+    </div>
+  );
+};
+
+export default function EnhancedTripPrintPage() {
   const router = useRouter();
   const params = useParams();
   const tripId = params.id as string;
   
   const [trip, setTrip] = useState<Trip | null>(null);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'timeline' | 'compact' | 'table'>('timeline');
+  const [viewMode, setViewMode] = useState<'detailed' | 'timeline' | 'compact' | 'table'>('detailed');
   const [showQrCode, setShowQrCode] = useState(false);
+  const [includeWeather, setIncludeWeather] = useState(true);
+  const [includePhotos, setIncludePhotos] = useState(true);
+  const [includeReviews, setIncludeReviews] = useState(false);
+  const [includeMap, setIncludeMap] = useState(true);
+  const [fontSize, setFontSize] = useState('medium');
   const printRef = useRef<HTMLDivElement>(null);
   
-  // Fetch trip data (simulated)
+  // Load trip data
   useEffect(() => {
-    // In a real application, you would fetch the trip data from an API
-    setTimeout(() => {
-      setTrip(sampleTrip);
-      setLoading(false);
-    }, 500);
+    const loadTripData = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/trips/${tripId}`);
+        if (!response.ok) throw new Error('Failed to fetch trip');
+        
+        const tripData = await response.json();
+        
+        // Load weather data for each day
+        const daysWithWeather = await Promise.all(
+          tripData.days.map(async (day: Day) => {
+            try {
+              if (tripData.city?.id) {
+                const weatherResponse = await fetch(
+                  `/api/cities/${tripData.city.id}/weather?date=${day.date}`
+                );
+                if (weatherResponse.ok) {
+                  const weatherData = await weatherResponse.json();
+                  return { ...day, weather: weatherData };
+                }
+              }
+              return day;
+            } catch (error) {
+              console.error('Failed to load weather for day:', day.dayNumber);
+              return day;
+            }
+          })
+        );
+        
+        setTrip({ ...tripData, days: daysWithWeather });
+      } catch (error) {
+        console.error('Error loading trip:', error);
+        setTrip(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (tripId) {
+      loadTripData();
+    }
   }, [tripId]);
   
   // Handle print
@@ -214,27 +249,43 @@ export default function TripPrintPage() {
     alert('Tính năng đang phát triển. Bạn có thể sử dụng chức năng in và lưu dưới dạng PDF.');
   };
   
-  // Calculate total duration in minutes
-  const calculateTotalDuration = (days: Day[]): number => {
-    return days.reduce(
-      (total, day) => total + day.places.reduce(
-        (dayTotal, place) => dayTotal + (place.duration || 0), 0
-      ), 0
-    );
+  // Calculate trip statistics
+  const calculateTripStats = () => {
+    if (!trip) return null;
+    
+    const totalPlaces = trip.days.reduce((sum, day) => sum + day.places.length, 0);
+    const avgRating = trip.days
+      .flatMap(day => day.places)
+      .filter(place => place.rating)
+      .reduce((sum, place, _, arr) => sum + (place.rating || 0) / arr.length, 0);
+    
+    const totalDuration = trip.days
+      .flatMap(day => day.places)
+      .reduce((sum, place) => sum + (place.duration || place.avgDurationMinutes || 0), 0);
+    
+    const placesByType = trip.days
+      .flatMap(day => day.places)
+      .reduce((acc, place) => {
+        acc[place.type] = (acc[place.type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+    
+    return {
+      totalPlaces,
+      avgRating: avgRating || 0,
+      totalDuration,
+      placesByType,
+      daysWithWeather: trip.days.filter(day => day.weather).length
+    };
   };
   
-  // Format time duration
-  const formatDuration = (minutes: number): string => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours > 0 ? `${hours} giờ ` : ''}${mins > 0 ? `${mins} phút` : ''}`;
-  };
+  const stats = calculateTripStats();
   
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <RefreshCw className="w-16 h-16 border-4 border-blue-500 animate-spin mx-auto mb-4" />
           <p className="text-gray-600">Đang tải dữ liệu...</p>
         </div>
       </div>
@@ -245,9 +296,7 @@ export default function TripPrintPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-6 bg-white rounded-xl shadow-sm">
-          <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+          <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-800 mb-2">Không tìm thấy lịch trình</h2>
           <p className="text-gray-600 mb-6">Lịch trình bạn đang tìm kiếm không tồn tại hoặc đã bị xóa.</p>
           <Link
@@ -267,8 +316,8 @@ export default function TripPrintPage() {
       {/* Header (hidden when printing) */}
       <header className="bg-white shadow-sm print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center mb-4 lg:mb-0">
               <Link href={`/trip-planner/${tripId}`} className="mr-4">
                 <ChevronLeft className="h-6 w-6 text-gray-500" />
               </Link>
@@ -278,13 +327,58 @@ export default function TripPrintPage() {
               </div>
             </div>
             
-            <div className="mt-4 md:mt-0 flex items-center space-x-3">
+            <div className="flex items-center space-x-3">
+              {/* View Mode Selection */}
+              <div className="flex bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('detailed')}
+                  className={`px-3 py-1 rounded text-sm transition-all ${
+                    viewMode === 'detailed' 
+                      ? 'bg-white shadow-sm text-blue-600' 
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  Chi tiết
+                </button>
+                <button
+                  onClick={() => setViewMode('timeline')}
+                  className={`px-3 py-1 rounded text-sm transition-all ${
+                    viewMode === 'timeline' 
+                      ? 'bg-white shadow-sm text-blue-600' 
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  Timeline
+                </button>
+                <button
+                  onClick={() => setViewMode('compact')}
+                  className={`px-3 py-1 rounded text-sm transition-all ${
+                    viewMode === 'compact' 
+                      ? 'bg-white shadow-sm text-blue-600' 
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  Gọn
+                </button>
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`px-3 py-1 rounded text-sm transition-all ${
+                    viewMode === 'table' 
+                      ? 'bg-white shadow-sm text-blue-600' 
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  Bảng
+                </button>
+              </div>
+              
+              {/* Print Options */}
               <button
                 onClick={() => setShowQrCode(!showQrCode)}
                 className="flex items-center py-2 px-4 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 <QrCode className="w-5 h-5 mr-2" />
-                <span>Mã QR</span>
+                <span>QR Code</span>
               </button>
               
               <button
@@ -300,86 +394,108 @@ export default function TripPrintPage() {
                 className="flex items-center py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 <Download className="w-5 h-5 mr-2" />
-                <span>Tải xuống PDF</span>
+                <span>Tải PDF</span>
               </button>
             </div>
           </div>
         </div>
       </header>
       
-      {/* View Mode Selection */}
+      {/* Print Options Panel */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 print:hidden">
-        <div className="flex justify-center space-x-2">
-          <button
-            onClick={() => setViewMode('timeline')}
-            className={`px-4 py-2 rounded-lg ${
-              viewMode === 'timeline' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-white text-gray-700 border border-gray-300'
-            }`}
-          >
-            Timeline
-          </button>
-          <button
-            onClick={() => setViewMode('compact')}
-            className={`px-4 py-2 rounded-lg ${
-              viewMode === 'compact' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-white text-gray-700 border border-gray-300'
-            }`}
-          >
-            Compact
-          </button>
-          <button
-            onClick={() => setViewMode('table')}
-            className={`px-4 py-2 rounded-lg ${
-              viewMode === 'table' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-white text-gray-700 border border-gray-300'
-            }`}
-          >
-            Bảng
-          </button>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <h3 className="font-medium text-gray-900 mb-3">Tùy chọn in</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={includeWeather}
+                onChange={(e) => setIncludeWeather(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700">Thời tiết</span>
+            </label>
+            
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={includePhotos}
+                onChange={(e) => setIncludePhotos(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700">Hình ảnh</span>
+            </label>
+            
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={includeReviews}
+                onChange={(e) => setIncludeReviews(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700">Đánh giá</span>
+            </label>
+            
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={includeMap}
+                onChange={(e) => setIncludeMap(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700">Bản đồ</span>
+            </label>
+            
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-700">Cỡ chữ:</span>
+              <select
+                value={fontSize}
+                onChange={(e) => setFontSize(e.target.value)}
+                className="text-sm border border-gray-300 rounded px-2 py-1"
+              >
+                <option value="small">Nhỏ</option>
+                <option value="medium">Vừa</option>
+                <option value="large">Lớn</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
       
       {/* QR Code Modal */}
       {showQrCode && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 print:hidden">
           <div className="bg-white rounded-xl w-full max-w-sm p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-800">Mã QR của lịch trình</h2>
+              <h2 className="text-xl font-bold text-gray-800">QR Code lịch trình</h2>
               <button 
                 className="text-gray-400 hover:text-gray-600"
                 onClick={() => setShowQrCode(false)}
               >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <ArrowLeft className="w-6 h-6" />
               </button>
             </div>
             
             <div className="text-center">
               <div className="mx-auto w-56 h-56 bg-gray-100 rounded-lg mb-4 flex items-center justify-center">
-                {/* Placeholder for QR code - would be a real QR code in production */}
                 <div className="w-48 h-48 bg-white p-4">
                   <div className="w-full h-full border-8 border-gray-800 rounded-xl relative">
                     <div className="absolute inset-4 border-4 border-gray-800 rounded"></div>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-xs text-gray-500">QR Code for Trip</span>
+                      <QrCode className="w-12 h-12 text-gray-600" />
                     </div>
                   </div>
                 </div>
               </div>
               
               <p className="text-sm text-gray-600 mb-4">
-                Quét mã QR này để xem lịch trình trên thiết bị di động hoặc chia sẻ với người khác.
+                Quét mã QR để xem lịch trình trên thiết bị di động
               </p>
               
               <button
                 onClick={() => {
-                  // In a real app, this would copy the trip URL to clipboard
-                  alert('Đã sao chép liên kết lịch trình vào bộ nhớ tạm.');
+                  navigator.clipboard.writeText(window.location.href);
+                  alert('Đã sao chép liên kết!');
                 }}
                 className="inline-flex items-center py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
@@ -394,53 +510,320 @@ export default function TripPrintPage() {
       {/* Printable Content */}
       <div 
         ref={printRef}
-        className="max-w-7xl mx-auto px-4 sm:px-6 py-8 print:p-0 print:max-w-none"
+        className={`max-w-7xl mx-auto px-4 sm:px-6 py-8 print:p-0 print:max-w-none ${
+          fontSize === 'small' ? 'text-sm' : fontSize === 'large' ? 'text-lg' : 'text-base'
+        }`}
       >
-        {/* Print Header (only visible when printing) */}
+        {/* Print Header */}
         <div className="hidden print:block mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">{trip.name}</h1>
-              <p className="text-gray-600">{trip.destination}</p>
-              <div className="flex items-center text-sm text-gray-500 mt-2">
-                <Calendar className="w-4 h-4 mr-1.5" />
-                <span>{formatDate(trip.startDate)} - {formatDate(trip.endDate)}</span>
+          <div className="text-center border-b border-gray-300 pb-6 mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">{trip.name}</h1>
+            <p className="text-xl text-gray-600 mb-4">{trip.destination}</p>
+            <div className="flex justify-center items-center space-x-8 text-sm text-gray-500">
+              <div className="flex items-center">
+                <Calendar className="w-4 h-4 mr-2" />
+                <span>{formatShortDate(trip.startDate)} - {formatShortDate(trip.endDate)}</span>
               </div>
-            </div>
-            <div className="text-right">
-              <div className="text-sm text-gray-500">Tổng cộng:</div>
-              <div className="font-medium">{trip.numDays} ngày</div>
-              <div className="font-medium">{trip.days.reduce((total, day) => total + day.places.length, 0)} địa điểm</div>
-              {calculateTotalDuration(trip.days) > 0 && (
-                <div className="font-medium">{formatDuration(calculateTotalDuration(trip.days))}</div>
+              <div className="flex items-center">
+                <Clock className="w-4 h-4 mr-2" />
+                <span>{trip.numDays} ngày</span>
+              </div>
+              <div className="flex items-center">
+                <MapPin className="w-4 h-4 mr-2" />
+                <span>{stats?.totalPlaces} địa điểm</span>
+              </div>
+              {trip.estimatedBudget && (
+                <div className="flex items-center">
+                  <DollarSign className="w-4 h-4 mr-2" />
+                  <span>{trip.estimatedBudget.toLocaleString('vi-VN')} VNĐ</span>
+                </div>
               )}
             </div>
           </div>
-          <div className="border-b border-gray-300 mt-4 mb-6"></div>
         </div>
+        
+        {/* Trip Summary (Print Only) */}
+        <div className="hidden print:block mb-8">
+          {trip.description && (
+            <div className="bg-gray-50 p-6 rounded-lg mb-6">
+              <h2 className="font-semibold text-gray-900 mb-2">Mô tả chuyến đi</h2>
+              <p className="text-gray-700">{trip.description}</p>
+            </div>
+          )}
+          
+          {stats && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">{stats.totalPlaces}</div>
+                <div className="text-sm text-gray-600">Tổng địa điểm</div>
+              </div>
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">{stats.avgRating.toFixed(1)}</div>
+                <div className="text-sm text-gray-600">Đánh giá TB</div>
+              </div>
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <div className="text-2xl font-bold text-purple-600">{formatDuration(stats.totalDuration)}</div>
+                <div className="text-sm text-gray-600">Tổng thời gian</div>
+              </div>
+              <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                <div className="text-2xl font-bold text-yellow-600">{stats.daysWithWeather}</div>
+                <div className="text-sm text-gray-600">Ngày có dự báo</div>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Detailed View */}
+        {viewMode === 'detailed' && (
+          <div className="space-y-8">
+            {trip.days.map((day) => (
+              <div key={day.dayNumber} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                {/* Day Header */}
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h2 className="text-2xl font-bold">Ngày {day.dayNumber}</h2>
+                      <p className="text-blue-100">{formatDate(day.date)}</p>
+                    </div>
+                    <div className="text-right">
+                      {includeWeather && day.weather && (
+                        <div className="flex items-center space-x-2 mb-2">
+                          {getWeatherIcon(day.weather.condition)}
+                          <span className="text-lg font-semibold">
+                            {day.weather.temperatureHigh}°/{day.weather.temperatureLow}°
+                          </span>
+                        </div>
+                      )}
+                      <div className="text-sm text-blue-100">
+                        {day.places.length} địa điểm
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Places */}
+                <div className="p-6 space-y-6">
+                  {day.places.map((place, index) => {
+                    const typeConfig = placeTypeConfig[place.type as keyof typeof placeTypeConfig] || placeTypeConfig.tourist_attraction;
+                    const TypeIcon = typeConfig.icon;
+                    
+                    return (
+                      <div key={place.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                        <div className="flex">
+                          {includePhotos && (
+                            <div className="relative h-32 w-32 flex-shrink-0">
+                              <Image
+                                src={place.photos?.[0]?.url || place.image}
+                                alt={place.name}
+                                fill
+                                className="object-cover"
+                              />
+                              {place.rating && (
+                                <div className="absolute top-2 left-2 bg-white/95 rounded-full px-2 py-1 flex items-center space-x-1">
+                                  <Star className="w-3 h-3 text-yellow-500 fill-current" />
+                                  <span className="text-xs font-semibold">{place.rating.toFixed(1)}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          <div className="flex-grow p-4">
+                            <div className="flex items-start justify-between mb-2">
+                              <div>
+                                <div className="flex items-center space-x-2 mb-1">
+                                  <div className={`p-1 rounded ${typeConfig.color}`}>
+                                    <TypeIcon className="w-4 h-4" />
+                                  </div>
+                                  <span className="text-xs font-medium text-gray-600">
+                                    {typeConfig.label}
+                                  </span>
+                                  {place.priceLevel && getPriceLevelIndicator(place.priceLevel)}
+                                </div>
+                                <h3 className="font-bold text-gray-900 text-lg">{place.name}</h3>
+                                <p className="text-gray-600">{place.address}</p>
+                              </div>
+                              
+                              <div className="text-right text-sm">
+                                <div className="font-semibold text-blue-600">#{index + 1}</div>
+                                {place.startTime && place.endTime && (
+                                  <div className="text-gray-600 mt-1">
+                                    {place.startTime} - {place.endTime}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
+                              {place.openingHours && (
+                                <div className="flex items-center">
+                                  <Clock className="w-4 h-4 mr-1" />
+                                  <span>{place.openingHours}</span>
+                                </div>
+                              )}
+                              
+                              {place.duration && (
+                                <div className="flex items-center">
+                                  <Zap className="w-4 h-4 mr-1" />
+                                  <span>{formatDuration(place.duration)}</span>
+                                </div>
+                              )}
+                              
+                              {place.website && (
+                                <div className="flex items-center">
+                                  <Globe className="w-4 h-4 mr-1" />
+                                  <span className="truncate">{place.website}</span>
+                                </div>
+                              )}
+                              
+                              {place.contactInfo && (
+                                <div className="flex items-center">
+                                  <Info className="w-4 h-4 mr-1" />
+                                  <span>{place.contactInfo}</span>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {place.description && (
+                              <p className="text-gray-700 text-sm mb-3">{place.description}</p>
+                            )}
+                            
+                            {place.notes && (
+                              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                                <h4 className="font-medium text-blue-900 mb-1">Ghi chú:</h4>
+                                <p className="text-blue-800 text-sm">{place.notes}</p>
+                              </div>
+                            )}
+                            
+                            {/* Reviews */}
+                            {includeReviews && place.reviews && place.reviews.length > 0 && (
+                              <div className="border-t border-gray-200 pt-3">
+                                <h4 className="font-medium text-gray-900 mb-2">Đánh giá nổi bật:</h4>
+                                <div className="space-y-2">
+                                  {place.reviews.slice(0, 2).map(review => (
+                                    <div key={review.id} className="bg-gray-50 rounded-lg p-3">
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="font-medium text-sm">{review.user.username}</span>
+                                        <div className="flex items-center">
+                                          <Star className="w-3 h-3 text-yellow-500 fill-current" />
+                                          <span className="text-xs ml-1">{review.rating}</span>
+                                        </div>
+                                      </div>
+                                      <p className="text-xs text-gray-700">{review.comment}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         
         {/* Timeline View */}
         {viewMode === 'timeline' && (
-          <div className="mb-8">
-            <ItineraryTimeline 
-              trip={trip} 
-              showDetailed={true}
-              onPrint={handlePrint}
-              onDownload={handleDownload}
-            />
+          <div className="space-y-6">
+            {trip.days.map((day) => (
+              <div key={day.dayNumber} className="relative">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-900">
+                        Ngày {day.dayNumber} - {formatDate(day.date)}
+                      </h2>
+                      <p className="text-gray-600">{day.places.length} địa điểm</p>
+                    </div>
+                    {includeWeather && day.weather && (
+                      <div className="flex items-center space-x-2">
+                        {getWeatherIcon(day.weather.condition)}
+                        <span className="font-semibold">
+                          {day.weather.temperatureHigh}°/{day.weather.temperatureLow}°
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="relative">
+                    <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+                    
+                    <div className="space-y-6">
+                      {day.places.map((place, index) => {
+                        const typeConfig = placeTypeConfig[place.type as keyof typeof placeTypeConfig] || placeTypeConfig.tourist_attraction;
+                        
+                        return (
+                          <div key={place.id} className="relative flex items-start space-x-4">
+                            <div className="relative z-10 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                              {index + 1}
+                            </div>
+                            
+                            <div className="flex-grow bg-gray-50 rounded-lg p-4">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-grow">
+                                  <div className="flex items-center space-x-2 mb-1">
+                                    <span className="text-lg font-semibold text-gray-900">{place.name}</span>
+                                    <span className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded-full">
+                                      {typeConfig.emoji} {typeConfig.label}
+                                    </span>
+                                  </div>
+                                  <p className="text-gray-600 text-sm mb-2">{place.address}</p>
+                                  
+                                  <div className="flex items-center space-x-4 text-xs text-gray-500">
+                                    {place.startTime && place.endTime && (
+                                      <span>⏰ {place.startTime} - {place.endTime}</span>
+                                    )}
+                                    {place.duration && (
+                                      <span>⏱️ {formatDuration(place.duration)}</span>
+                                    )}
+                                    {place.rating && (
+                                      <span>⭐ {place.rating.toFixed(1)}</span>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {includePhotos && (
+                                  <div className="relative h-16 w-16 ml-4 rounded-lg overflow-hidden flex-shrink-0">
+                                    <Image
+                                      src={place.photos?.[0]?.url || place.image}
+                                      alt={place.name}
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {place.notes && (
+                                <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                                  <strong>Ghi chú:</strong> {place.notes}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
         
         {/* Compact View */}
         {viewMode === 'compact' && (
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
-            <div className="bg-blue-600 text-white p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
               <h1 className="text-2xl font-bold">{trip.name}</h1>
               <p className="text-blue-100">{trip.destination}</p>
               <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm mt-2">
                 <div className="flex items-center">
                   <Calendar className="w-4 h-4 mr-1.5" />
-                  <span>{formatDate(trip.startDate)} - {formatDate(trip.endDate)}</span>
+                  <span>{formatShortDate(trip.startDate)} - {formatShortDate(trip.endDate)}</span>
                 </div>
                 <div className="flex items-center">
                   <Clock className="w-4 h-4 mr-1.5" />
@@ -448,7 +831,7 @@ export default function TripPrintPage() {
                 </div>
                 <div className="flex items-center">
                   <MapPin className="w-4 h-4 mr-1.5" />
-                  <span>{trip.days.reduce((total, day) => total + day.places.length, 0)} địa điểm</span>
+                  <span>{stats?.totalPlaces} địa điểm</span>
                 </div>
               </div>
             </div>
@@ -460,166 +843,196 @@ export default function TripPrintPage() {
                     <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-lg mr-3">
                       {day.dayNumber}
                     </div>
-                    <div>
+                    <div className="flex-grow">
                       <h2 className="font-bold text-gray-800">Ngày {day.dayNumber}</h2>
                       <p className="text-sm text-gray-600">{formatDate(day.date)}</p>
                     </div>
+                    {includeWeather && day.weather && (
+                      <div className="flex items-center space-x-2">
+                        {getWeatherIcon(day.weather.condition)}
+                        <span className="text-sm font-medium">
+                          {day.weather.temperatureHigh}°/{day.weather.temperatureLow}°
+                        </span>
+                      </div>
+                    )}
                   </div>
                   
                   {day.places.length === 0 ? (
-                    <p className="text-gray-500 italic">
-                      Chưa có địa điểm nào cho ngày này
-                    </p>
+                    <p className="text-gray-500 italic">Chưa có địa điểm nào cho ngày này</p>
                   ) : (
                     <div className="space-y-3">
-                      {day.places.map((place, index) => (
-                        <div key={place.id} className="flex items-start">
-                          <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 font-medium mr-3 mt-1">
-                            {index + 1}
-                          </div>
-                          <div className="flex-grow">
-                            <h3 className="font-medium text-gray-800">{place.name}</h3>
-                            <p className="text-sm text-gray-500 mb-1">{place.address}</p>
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
-                              {place.startTime && place.endTime && (
-                                <span>
-                                  ⏱️ {place.startTime} - {place.endTime}
-                                </span>
-                              )}
-                              {place.duration && (
-                                <span>
-                                  ⌛ {formatDuration(place.duration)}
-                                </span>
-                              )}
-                              {place.openingHours && (
-                                <span>
-                                  🕒 Mở cửa: {place.openingHours}
-                                </span>
+                      {day.places.map((place, index) => {
+                        const typeConfig = placeTypeConfig[place.type as keyof typeof placeTypeConfig] || placeTypeConfig.tourist_attraction;
+                        
+                        return (
+                          <div key={place.id} className="flex items-start">
+                            <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 font-medium mr-3 mt-1 text-sm">
+                              {index + 1}
+                            </div>
+                            <div className="flex-grow">
+                              <div className="flex items-center space-x-2 mb-1">
+                                <h3 className="font-medium text-gray-800">{place.name}</h3>
+                                <span className="text-xs">{typeConfig.emoji}</span>
+                                {place.rating && (
+                                  <div className="flex items-center">
+                                    <Star className="w-3 h-3 text-yellow-500 fill-current" />
+                                    <span className="text-xs ml-0.5">{place.rating.toFixed(1)}</span>
+                                  </div>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-500 mb-1">{place.address}</p>
+                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                                {place.startTime && place.endTime && (
+                                  <span>⏰ {place.startTime} - {place.endTime}</span>
+                                )}
+                                {place.duration && (
+                                  <span>⏱️ {formatDuration(place.duration)}</span>
+                                )}
+                                {place.openingHours && (
+                                  <span>🕒 Mở cửa: {place.openingHours}</span>
+                                )}
+                              </div>
+                              {place.notes && (
+                                <p className="text-xs italic mt-1 text-blue-700 bg-blue-50 p-1 rounded">
+                                  {place.notes}
+                                </p>
                               )}
                             </div>
-                            {place.notes && (
-                              <p className="text-xs italic mt-1">
-                                {place.notes}
-                              </p>
-                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
               ))}
-            </div>
-            
-            <div className="bg-gray-50 p-4 text-center text-xs text-gray-500">
-              Lịch trình này được tạo bởi ứng dụng TravelSense. Thời gian và giờ mở cửa có thể thay đổi.
             </div>
           </div>
         )}
         
         {/* Table View */}
         {viewMode === 'table' && (
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
-            <div className="bg-blue-600 text-white p-6">
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
               <h1 className="text-2xl font-bold">{trip.name}</h1>
               <p className="text-blue-100">{trip.destination}</p>
-              <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm mt-2">
-                <div className="flex items-center">
-                  <Calendar className="w-4 h-4 mr-1.5" />
-                  <span>{formatDate(trip.startDate)} - {formatDate(trip.endDate)}</span>
-                </div>
-                <div className="flex items-center">
-                  <Clock className="w-4 h-4 mr-1.5" />
-                  <span>{trip.numDays} ngày</span>
-                </div>
-              </div>
             </div>
             
-            <div className="p-6">
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-collapse">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="px-4 py-3 border text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ngày</th>
-                      <th className="px-4 py-3 border text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Địa điểm</th>
-                      <th className="px-4 py-3 border text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Thời gian</th>
-                      <th className="px-4 py-3 border text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Thời lượng</th>
-                      <th className="px-4 py-3 border text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ghi chú</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {trip.days.map((day) => (
-                      <React.Fragment key={day.dayNumber}>
-                        {day.places.length === 0 ? (
-                          <tr>
-                            <td className="px-4 py-4 border">
-                              <div className="font-medium text-gray-800">Ngày {day.dayNumber}</div>
-                              <div className="text-sm text-gray-500">{formatDate(day.date)}</div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Ngày
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Địa điểm
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Loại
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Thời gian
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Thời lượng
+                    </th>
+                    {includeWeather && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Thời tiết
+                      </th>
+                    )}
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Ghi chú
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {trip.days.flatMap((day) =>
+                    day.places.length === 0 ? (
+                      <tr key={`${day.dayNumber}-empty`}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="font-medium text-gray-900">Ngày {day.dayNumber}</div>
+                          <div className="text-sm text-gray-500">{formatShortDate(day.date)}</div>
+                        </td>
+                        <td className="px-6 py-4 text-gray-500 italic" colSpan={includeWeather ? 6 : 5}>
+                          Chưa có địa điểm nào
+                        </td>
+                      </tr>
+                    ) : (
+                      day.places.map((place, placeIndex) => {
+                        const typeConfig = placeTypeConfig[place.type as keyof typeof placeTypeConfig] || placeTypeConfig.tourist_attraction;
+                        
+                        return (
+                          <tr key={place.id}>
+                            {placeIndex === 0 && (
+                              <td className="px-6 py-4 whitespace-nowrap" rowSpan={day.places.length}>
+                                <div className="font-medium text-gray-900">Ngày {day.dayNumber}</div>
+                                <div className="text-sm text-gray-500">{formatShortDate(day.date)}</div>
+                              </td>
+                            )}
+                            <td className="px-6 py-4">
+                              <div className="font-medium text-gray-900">{place.name}</div>
+                              <div className="text-sm text-gray-500">{place.address}</div>
+                              {place.rating && (
+                                <div className="flex items-center mt-1">
+                                  <Star className="w-3 h-3 text-yellow-500 fill-current mr-1" />
+                                  <span className="text-xs">{place.rating.toFixed(1)}</span>
+                                </div>
+                              )}
                             </td>
-                            <td className="px-4 py-4 border italic text-gray-500" colSpan={4}>
-                              Chưa có địa điểm nào cho ngày này
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="inline-flex items-center text-xs">
+                                {typeConfig.emoji} {typeConfig.label}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {place.startTime && place.endTime ? (
+                                `${place.startTime} - ${place.endTime}`
+                              ) : (
+                                <span className="text-gray-400">—</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {place.duration ? (
+                                formatDuration(place.duration)
+                              ) : (
+                                <span className="text-gray-400">—</span>
+                              )}
+                            </td>
+                            {includeWeather && placeIndex === 0 && (
+                              <td className="px-6 py-4 whitespace-nowrap" rowSpan={day.places.length}>
+                                {day.weather ? (
+                                  <div className="flex items-center space-x-2">
+                                    {getWeatherIcon(day.weather.condition)}
+                                    <span className="text-sm">
+                                      {day.weather.temperatureHigh}°/{day.weather.temperatureLow}°
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400">—</span>
+                                )}
+                              </td>
+                            )}
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              {place.notes || <span className="text-gray-400">—</span>}
                             </td>
                           </tr>
-                        ) : (
-                          day.places.map((place, index) => (
-                            <tr key={place.id} className="hover:bg-gray-50">
-                              {index === 0 && (
-                                <td className="px-4 py-4 border" rowSpan={day.places.length}>
-                                  <div className="font-medium text-gray-800">Ngày {day.dayNumber}</div>
-                                  <div className="text-sm text-gray-500">{formatDate(day.date)}</div>
-                                </td>
-                              )}
-                              <td className="px-4 py-4 border">
-                                <div className="font-medium text-gray-800">{place.name}</div>
-                                <div className="text-sm text-gray-500">{place.address}</div>
-                                {place.openingHours && (
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    Mở cửa: {place.openingHours}
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-4 py-4 border">
-                                {place.startTime && place.endTime ? (
-                                  <div className="text-sm">
-                                    {place.startTime} - {place.endTime}
-                                  </div>
-                                ) : (
-                                  <span className="text-gray-400">—</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-4 border">
-                                {place.duration ? (
-                                  <div className="text-sm">
-                                    {formatDuration(place.duration)}
-                                  </div>
-                                ) : (
-                                  <span className="text-gray-400">—</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-4 border">
-                                {place.notes ? (
-                                  <div className="text-sm">
-                                    {place.notes}
-                                  </div>
-                                ) : (
-                                  <span className="text-gray-400">—</span>
-                                )}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            
-            <div className="bg-gray-50 p-4 text-center text-xs text-gray-500">
-              Lịch trình này được tạo bởi ứng dụng TravelSense. Thời gian và giờ mở cửa có thể thay đổi.
+                        );
+                      })
+                    )
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
+        
+        {/* Footer */}
+        <div className="mt-12 pt-8 border-t border-gray-200 text-center text-sm text-gray-500">
+          <p>Lịch trình này được tạo bởi TravelSense AI</p>
+          <p className="mt-1">Thời gian và giờ mở cửa có thể thay đổi. Luôn kiểm tra thông tin mới nhất trước khi ghé thăm.</p>
+          <p className="mt-2 text-xs">In lúc: {new Date().toLocaleString('vi-VN')}</p>
+        </div>
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
     const tripId = parseInt(id);    
+    
     const trip = await prisma.trip.findUnique({
       where: { id: tripId },
       include: {
@@ -20,7 +21,12 @@ export async function GET(request: NextRequest, { params }: Params) {
           include: {
             itineraryItems: {
               include: {
-                place: true
+                place: {
+                  include: {
+                    category: true, // Include category information
+                    city: true
+                  }
+                }
               },
               orderBy: { orderIndex: 'asc' }
             }
@@ -59,35 +65,86 @@ export async function GET(request: NextRequest, { params }: Params) {
       status: trip.status as 'draft' | 'planned' | 'completed',
       description: trip.description,
       days: trip.days.map(day => ({
+        id: day.id,
         dayNumber: day.dayNumber,
         date: day.date.toISOString().split('T')[0],
+        notes: day.notes,
         places: day.itineraryItems.map(item => ({
           id: item.place?.id.toString() || item.id.toString(),
           name: item.place?.name || '',
-          type: getPlaceType(item.place?.categoryId),
+          type: item.place?.category?.name || 'other', // Lấy type từ category name
+          categoryId: item.place?.categoryId,
+          category: item.place?.category, // Include full category object
           address: item.place?.address || '',
           latitude: item.place?.latitude?.toString() || '0',
           longitude: item.place?.longitude?.toString() || '0',
           image: item.place?.imageUrl || '/images/default-place.jpg',
-          startTime: item.startTime ? item.startTime.toISOString().slice(11, 16) : undefined,
-          endTime: item.endTime ? item.endTime.toISOString().slice(11, 16) : undefined,
+          startTime: item.startTime ? formatTimeFromDB(item.startTime) : undefined,
+          endTime: item.endTime ? formatTimeFromDB(item.endTime) : undefined,
           duration: item.durationMinutes,
           notes: item.notes,
           openingHours: item.place?.openingHours,
-          rating: item.place?.rating ? parseFloat(item.place.rating.toString()) : undefined
+          rating: item.place?.rating ? parseFloat(item.place.rating.toString()) : undefined,
+          description: item.place?.description,
+          // Thêm các field khác nếu cần
+          orderIndex: item.orderIndex,
+          estimatedCost: item.place?.priceLevel ? getPriceEstimate(item.place.priceLevel) : undefined
         }))
       })),
       tags: trip.tags.map(tripTag => tripTag.tag.name),
       user: trip.user,
-      city: trip.city
+      city: trip.city,
+      // Thêm thống kê tổng quan
+      totalPlaces: trip.days.reduce((total, day) => total + day.itineraryItems.length, 0),
+      placesCount: trip.days.reduce((total, day) => total + day.itineraryItems.length, 0)
     };
-     return NextResponse.json(transformedTrip);
+
+    return NextResponse.json(transformedTrip);
   } catch (error) {
     console.error('Error fetching trip:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
+// Helper function để format time từ database
+function formatTimeFromDB(timeValue: any): string | undefined {
+  if (!timeValue) return undefined;
+  
+  try {
+    // Nếu là Date object
+    if (timeValue instanceof Date) {
+      return timeValue.toISOString().slice(11, 16); // HH:MM
+    }
+    
+    // Nếu là string có format time
+    if (typeof timeValue === 'string') {
+      // Nếu là ISO string
+      if (timeValue.includes('T')) {
+        return new Date(timeValue).toISOString().slice(11, 16);
+      }
+      // Nếu đã là format HH:MM hoặc HH:MM:SS
+      if (timeValue.match(/^\d{2}:\d{2}(:\d{2})?$/)) {
+        return timeValue.slice(0, 5); // Lấy HH:MM
+      }
+    }
+    
+    return undefined;
+  } catch (error) {
+    console.error('Error formatting time:', error);
+    return undefined;
+  }
+}
+
+// Helper function để estimate giá từ price level
+function getPriceEstimate(priceLevel: string): number | undefined {
+  const priceMap: { [key: string]: number } = {
+    'cheap': 50000,
+    'moderate': 200000,
+    'expensive': 500000
+  };
+  
+  return priceMap[priceLevel.toLowerCase()] || undefined;
+}
 // PUT - Cập nhật trip
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
