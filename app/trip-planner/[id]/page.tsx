@@ -1406,7 +1406,6 @@ export default function ModernTripDetailsPage() {
         />
       )}
       <FloatingMapButton tripId={tripId} activeDay={activeDay} />
-
     </div>
   );
 }
