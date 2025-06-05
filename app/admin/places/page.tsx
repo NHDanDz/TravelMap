@@ -1,11 +1,12 @@
 // app/admin/places/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Plus, Search, Edit, Trash2, MapPin, Star, Building2,
   Filter, MoreVertical, ExternalLink, Image as ImageIcon,
-  Clock, Phone, Globe, AlertCircle, CheckCircle, X
+  Clock, Phone, Globe, AlertCircle, CheckCircle, X,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 interface Place {
@@ -63,18 +64,34 @@ interface PlaceFormData {
   priceLevel: string;
 }
 
+interface PaginationData {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 const AdminPlacesPage = () => {
+  // State for data
   const [places, setPlaces] = useState<Place[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [cities, setCities] = useState<City[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Filters and search
+  // State for filters and search (sẽ gửi lên server)
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedCity, setSelectedCity] = useState<string>('');
-  const [sortBy, setSortBy] = useState<string>('name');
+  const [sortBy, setSortBy] = useState<string>('rating'); // Sort ở server
+  
+  // State for pagination
+  const [pagination, setPagination] = useState<PaginationData>({
+    total: 0,
+    page: 1,
+    limit: 25,
+    totalPages: 0
+  });
   
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -100,89 +117,165 @@ const AdminPlacesPage = () => {
   });
   const [formLoading, setFormLoading] = useState(false);
 
+  // Debounced search để tránh gọi API quá nhiều
+  const [searchDebounceTimer, setSearchDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+
+  // Fetch data function với server-side pagination
+  const fetchData = useCallback(async (
+    page: number = pagination.page,
+    limit: number = pagination.limit,
+    search: string = searchTerm,
+    category: string = selectedCategory,
+    city: string = selectedCity,
+    sort: string = sortBy
+  ) => {
+    try {
+      setLoading(true);
+      console.log('🔄 Fetching data with params:', { page, limit, search, category, city, sort });
+      
+      // Build query parameters for places API
+      const placesParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString()
+      });
+      
+      // Add filters if they exist
+      if (search.trim()) {
+        placesParams.set('search', search.trim());
+      }
+      if (category) {
+        // Gửi categoryId trực tiếp
+        placesParams.set('categoryId', category);
+        console.log('🏷️ Adding categoryId filter:', category);
+      }
+      if (city) {
+        // Gửi cityId trực tiếp
+        placesParams.set('cityId', city);
+        console.log('🏙️ Adding cityId filter:', city);
+      }
+      
+      console.log('🔗 Final API URL:', `/api/admin/places?${placesParams.toString()}`);
+      
+      const [placesRes, categoriesRes, citiesRes] = await Promise.all([
+        fetch(`/api/admin/places?${placesParams.toString()}`),
+        categories.length === 0 ? fetch('/api/categories') : Promise.resolve(null),
+        cities.length === 0 ? fetch('/api/cities') : Promise.resolve(null)
+      ]);
+
+      console.log('📡 Response status:', {
+        places: placesRes.status,
+        categories: categoriesRes?.status || 'cached',
+        cities: citiesRes?.status || 'cached'
+      });
+
+      if (!placesRes.ok) {
+        throw new Error(`Failed to fetch places - Status: ${placesRes.status}`);
+      }
+
+      const placesData = await placesRes.json();
+      console.log('📦 Places API response:', placesData);
+
+      // Chỉ fetch categories và cities lần đầu
+      if (categoriesRes && !categoriesRes.ok) {
+        throw new Error(`Failed to fetch categories - Status: ${categoriesRes.status}`);
+      }
+      if (citiesRes && !citiesRes.ok) {
+        throw new Error(`Failed to fetch cities - Status: ${citiesRes.status}`);
+      }
+
+      const [categoriesData, citiesData] = await Promise.all([
+        categoriesRes ? categoriesRes.json() : categories,
+        citiesRes ? citiesRes.json() : cities
+      ]);
+
+      // Update state
+      setPlaces(placesData.places || []);
+      if (categoriesRes) setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+      if (citiesRes) setCities(Array.isArray(citiesData) ? citiesData : []);
+      
+      // Update pagination với data từ server
+      setPagination({
+        total: placesData.pagination?.total || 0,
+        page: placesData.pagination?.page || 1,
+        limit: placesData.pagination?.limit || limit,
+        totalPages: placesData.pagination?.totalPages || 0
+      });
+
+      console.log('✅ Data updated:', {
+        places: placesData.places?.length || 0,
+        total: placesData.pagination?.total || 0,
+        currentPage: placesData.pagination?.page || 1,
+        totalPages: placesData.pagination?.totalPages || 0
+      });
+      
+    } catch (err) {
+      console.error('❌ Error in fetchData:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  }, [pagination.page, pagination.limit, searchTerm, selectedCategory, selectedCity, sortBy]);
+
+  // Initial data load
   useEffect(() => {
     fetchData();
   }, []);
 
-const fetchData = async () => {
-  try {
-    setLoading(true);
-    console.log('🔄 Starting to fetch data...');
+  // Handle search với debounce
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchTerm(value);
     
-    const [placesRes, categoriesRes, citiesRes] = await Promise.all([
-      fetch('/api/admin/places'),
-      fetch('/api/categories'),
-      fetch('/api/cities')
-    ]);
-
-    console.log('📡 Response status:', {
-      places: placesRes.status,
-      categories: categoriesRes.status,
-      cities: citiesRes.status
-    });
-
-    if (!placesRes.ok || !categoriesRes.ok || !citiesRes.ok) {
-      throw new Error(`Failed to fetch data - Places: ${placesRes.status}, Categories: ${categoriesRes.status}, Cities: ${citiesRes.status}`);
+    // Clear existing timer
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer);
     }
-
-    const [placesData, categoriesData, citiesData] = await Promise.all([
-      placesRes.json(),
-      categoriesRes.json(),
-      citiesRes.json()
-    ]);
-
-    console.log('📦 Raw API responses:', {
-      placesData,
-      categoriesData,
-      citiesData
-    });
-
-    // API trả về { places: [...], pagination: {...} } nhưng component expect array
-    const placesArray = placesData?.places || placesData || [];
-    const categoriesArray = Array.isArray(categoriesData) ? categoriesData : [];
-    const citiesArray = Array.isArray(citiesData) ? citiesData : [];
-
-    console.log('✅ Processed arrays:', {
-      places: placesArray.length,
-      categories: categoriesArray.length,
-      cities: citiesArray.length
-    });
-
-    setPlaces(placesArray);
-    setCategories(categoriesArray);
-    setCities(citiesArray);
-  } catch (err) {
-    console.error('❌ Error in fetchData:', err);
-    setError(err instanceof Error ? err.message : 'Failed to load data');
-    setPlaces([]);
-    setCategories([]);
-    setCities([]);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  const filteredPlaces = places.filter(place => {
-    const matchesSearch = place.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        place.address?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = !selectedCategory || place.category?.id.toString() === selectedCategory;
-    const matchesCity = !selectedCity || place.city?.id.toString() === selectedCity;
     
-    return matchesSearch && matchesCategory && matchesCity;
-  }).sort((a, b) => {
-    switch (sortBy) {
-      case 'name':
-        return a.name.localeCompare(b.name);
-      case 'rating':
-        const ratingA = a.rating ? parseFloat(a.rating.toString()) : 0;
-        const ratingB = b.rating ? parseFloat(b.rating.toString()) : 0;
-        return ratingB - ratingA;
-      case 'created':
-        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-      default:
-        return 0;
+    // Set new timer
+    const timer = setTimeout(() => {
+      fetchData(1, pagination.limit, value, selectedCategory, selectedCity, sortBy);
+    }, 500); // Delay 500ms
+    
+    setSearchDebounceTimer(timer);
+  }, [searchDebounceTimer, pagination.limit, selectedCategory, selectedCity, sortBy]);
+
+  // Handle filter changes
+  const handleCategoryChange = useCallback((category: string) => {
+    setSelectedCategory(category);
+    // Reset về trang 1 khi thay đổi filter
+    fetchData(1, pagination.limit, searchTerm, category, selectedCity, sortBy);
+  }, [pagination.limit, searchTerm, selectedCity, sortBy]);
+
+  const handleCityChange = useCallback((city: string) => {
+    setSelectedCity(city);
+    // Reset về trang 1 khi thay đổi filter
+    fetchData(1, pagination.limit, searchTerm, selectedCategory, city, sortBy);
+  }, [pagination.limit, searchTerm, selectedCategory, sortBy]);
+
+  const handleSortChange = useCallback((sort: string) => {
+    setSortBy(sort);
+    // Giữ nguyên trang hiện tại khi sort
+    fetchData(pagination.page, pagination.limit, searchTerm, selectedCategory, selectedCity, sort);
+  }, [pagination.page, pagination.limit, searchTerm, selectedCategory, selectedCity]);
+
+  // Handle pagination
+  const handlePageChange = useCallback((page: number) => {
+    if (page >= 1 && page <= pagination.totalPages) {
+      fetchData(page, pagination.limit, searchTerm, selectedCategory, selectedCity, sortBy);
     }
-  });
+  }, [pagination.totalPages, pagination.limit, searchTerm, selectedCategory, selectedCity, sortBy]);
+
+  const handleLimitChange = useCallback((limit: number) => {
+    fetchData(1, limit, searchTerm, selectedCategory, selectedCity, sortBy);
+  }, [searchTerm, selectedCategory, selectedCity, sortBy]);
+
+  // Cleanup debounce timer
+  useEffect(() => {
+    return () => {
+      if (searchDebounceTimer) {
+        clearTimeout(searchDebounceTimer);
+      }
+    };
+  }, [searchDebounceTimer]);
 
   const resetForm = () => {
     setFormData({
@@ -262,6 +355,7 @@ const fetchData = async () => {
         throw new Error(errorData.error || 'Failed to save place');
       }
 
+      // Refresh current page data
       await fetchData();
       setShowAddModal(false);
       setShowEditModal(false);
@@ -288,6 +382,7 @@ const fetchData = async () => {
         throw new Error(errorData.error || 'Failed to delete place');
       }
 
+      // Refresh current page data
       await fetchData();
       setShowDeleteModal(false);
       setSelectedPlace(null);
@@ -313,7 +408,38 @@ const fetchData = async () => {
     }
   };
 
-  if (loading) {
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const { page: currentPage, totalPages } = pagination;
+    const pages = [];
+    const maxVisiblePages = 5;
+    
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1);
+        pages.push('...');
+        for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('...');
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      }
+    }
+    
+    return pages;
+  };
+
+  if (loading && places.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -366,14 +492,22 @@ const fetchData = async () => {
               type="text"
               placeholder="Tìm kiếm địa điểm..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {loading && searchTerm && (
+              <div className="absolute right-3 top-3">
+                <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+              </div>
+            )}
           </div>
           
           <select
             value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
+            onChange={(e) => {
+              console.log('🔄 Category changed:', e.target.value);
+              handleCategoryChange(e.target.value);
+            }}
             className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Tất cả danh mục</option>
@@ -386,7 +520,10 @@ const fetchData = async () => {
           
           <select
             value={selectedCity}
-            onChange={(e) => setSelectedCity(e.target.value)}
+            onChange={(e) => {
+              console.log('🔄 City changed:', e.target.value);
+              handleCityChange(e.target.value);
+            }}
             className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Tất cả thành phố</option>
@@ -399,17 +536,37 @@ const fetchData = async () => {
           
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
+            onChange={(e) => {
+              console.log('🔄 Sort changed:', e.target.value);
+              handleSortChange(e.target.value);
+            }}
             className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="name">Sắp xếp theo tên</option>
             <option value="rating">Sắp xếp theo đánh giá</option>
-            <option value="created">Sắp xếp theo ngày tạo</option>
+            <option value="name">Sắp xếp theo tên</option>
+            <option value="createdAt">Sắp xếp theo ngày tạo</option>
           </select>
         </div>
         
-        <div className="mt-4 text-sm text-gray-600">
-          Hiển thị {filteredPlaces.length} / {places.length} địa điểm
+        <div className="mt-4 flex justify-between items-center">
+          <div className="text-sm text-gray-600">
+            Hiển thị {((pagination.page - 1) * pagination.limit) + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)} / {pagination.total} địa điểm
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-600">Hiển thị:</span>
+            <select
+              value={pagination.limit}
+              onChange={(e) => handleLimitChange(Number(e.target.value))}
+              className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span className="text-sm text-gray-600">mục/trang</span>
+          </div>
         </div>
       </div>
 
@@ -443,7 +600,7 @@ const fetchData = async () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredPlaces.map((place) => (
+              {places.map((place) => (
                 <tr key={place.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -531,13 +688,101 @@ const fetchData = async () => {
           </table>
         </div>
         
-        {filteredPlaces.length === 0 && (
+        {places.length === 0 && !loading && (
           <div className="text-center py-12">
             <MapPin className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">Không tìm thấy địa điểm</h3>
             <p className="mt-1 text-sm text-gray-500">
               Thử thay đổi bộ lọc hoặc thêm địa điểm mới.
             </p>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {pagination.totalPages > 1 && (
+          <div className="bg-white px-6 py-3 border-t border-gray-200">
+            {/* Mobile pagination */}
+            <div className="flex justify-between sm:hidden">
+              <button
+                onClick={() => handlePageChange(pagination.page - 1)}
+                disabled={pagination.page === 1 || loading}
+                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Trước
+              </button>
+              <span className="text-sm text-gray-700 flex items-center">
+                Trang {pagination.page} / {pagination.totalPages}
+              </span>
+              <button
+                onClick={() => handlePageChange(pagination.page + 1)}
+                disabled={pagination.page === pagination.totalPages || loading}
+                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Sau
+              </button>
+            </div>
+            
+            {/* Desktop pagination */}
+            <div className="hidden sm:flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-700">
+                  Hiển thị <span className="font-medium">{((pagination.page - 1) * pagination.limit) + 1}</span> đến{' '}
+                  <span className="font-medium">{Math.min(pagination.page * pagination.limit, pagination.total)}</span> trong{' '}
+                  <span className="font-medium">{pagination.total}</span> kết quả
+                </p>
+              </div>
+              <div>
+                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                  {/* Previous button */}
+                  <button
+                    onClick={() => handlePageChange(pagination.page - 1)}
+                    disabled={pagination.page === 1 || loading}
+                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+
+                  {/* Page numbers */}
+                  {getPageNumbers().map((pageNum, index) => {
+                    if (pageNum === '...') {
+                      return (
+                        <span
+                          key={`ellipsis-${index}`}
+                          className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700"
+                        >
+                          ...
+                        </span>
+                      );
+                    }
+                    
+                    const isCurrentPage = pageNum === pagination.page;
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => handlePageChange(pageNum as number)}
+                        disabled={loading}
+                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                          isCurrentPage
+                            ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                        } disabled:opacity-50`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+
+                  {/* Next button */}
+                  <button
+                    onClick={() => handlePageChange(pagination.page + 1)}
+                    disabled={pagination.page === pagination.totalPages || loading}
+                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </nav>
+              </div>
+            </div>
           </div>
         )}
       </div>

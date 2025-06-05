@@ -126,23 +126,23 @@ const MapGLWrapper = forwardRef<MapboxMap, React.ComponentProps<typeof ReactMapG
   }, [props.mapboxAccessToken]);
 
   // Loading overlay
-  const LoadingOverlay = () => (
-    <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center z-50">
-      <div className="text-center">
-        <div className="relative mb-4">
-          <div className="w-16 h-16 border-4 border-blue-200 rounded-full animate-spin border-t-blue-600"></div>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </div>
+const LoadingOverlay = () => (
+  <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center z-50">
+    <div className="text-center">
+      <div className="relative w-16 h-16 mx-auto mb-4">
+        <div className="w-full h-full border-4 border-blue-200 rounded-full animate-spin border-t-blue-600"></div>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
         </div>
-        <p className="text-gray-600 font-medium">Đang tải bản đồ...</p>
-        <p className="text-sm text-gray-500 mt-1">Vui lòng đợi trong giây lát</p>
       </div>
+      <p className="text-gray-600 font-medium">Đang tải bản đồ...</p>
+      <p className="text-sm text-gray-500 mt-1">Vui lòng đợi trong giây lát</p>
     </div>
-  );
+  </div>
+);
 
   // Error overlay
   const ErrorOverlay = ({ message }: { message: string }) => (

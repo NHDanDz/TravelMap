@@ -126,8 +126,8 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'succes
 const LoadingSpinner = () => (
   <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
     <div className="text-center">
-      <div className="relative">
-        <div className="w-20 h-20 border-4 border-blue-200 rounded-full animate-spin border-t-blue-600 mx-auto mb-4"></div>
+      <div className="relative w-20 h-20 mx-auto mb-4">
+        <div className="w-full h-full border-4 border-blue-200 rounded-full animate-spin border-t-blue-600"></div>
         <div className="absolute inset-0 flex items-center justify-center">
           <Map className="w-8 h-8 text-blue-600 animate-pulse" />
         </div>
@@ -137,7 +137,6 @@ const LoadingSpinner = () => (
     </div>
   </div>
 );
-
 export default function TripMapPage() {
   const router = useRouter();
   const params = useParams();

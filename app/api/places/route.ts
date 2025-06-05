@@ -11,8 +11,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10');
     const page = parseInt(searchParams.get('page') || '1');
     const skip = (page - 1) * limit;
-
-    // Xây dựng điều kiện lọc
+     // Xây dựng điều kiện lọc
     const where: any = {};
     
     if (category) {

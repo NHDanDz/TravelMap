@@ -800,7 +800,7 @@ const handleCreateTrip = async (e: React.FormEvent) => {
   const start = new Date(newTrip.startDate);
   const end = new Date(newTrip.endDate);
   
-  if (end <= start) {
+  if (end < start) {
     alert('Ngày kết thúc phải sau ngày bắt đầu');
     return;
   }

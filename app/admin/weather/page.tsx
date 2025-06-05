@@ -6,7 +6,7 @@ import {
   CloudRain, Search, Plus, Edit, Trash2, Download, Upload,
   Sun, Cloud, CloudSnow, Thermometer, Droplets, Wind,
   Calendar, MapPin, RefreshCw, AlertCircle, X, Eye,
-  TrendingUp, TrendingDown, Activity
+  TrendingUp, TrendingDown, Activity, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 interface WeatherData {
@@ -47,6 +47,13 @@ interface WeatherFormData {
   windSpeed: string;
 }
 
+interface PaginationData {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
 const AdminWeatherPage = () => {
   const [weatherData, setWeatherData] = useState<WeatherData[]>([]);
   const [cities, setCities] = useState<{id: number; name: string; country: string}[]>([]);
@@ -61,11 +68,18 @@ const AdminWeatherPage = () => {
   const [dateRange, setDateRange] = useState<string>('week');
   const [sortBy, setSortBy] = useState<string>('date');
   
+  // Pagination
+  const [pagination, setPagination] = useState<PaginationData>({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0
+  });
+  
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [selectedWeather, setSelectedWeather] = useState<WeatherData | null>(null);
   
   // Form state
@@ -102,89 +116,98 @@ const AdminWeatherPage = () => {
     windy: 'Có gió'
   };
 
+  // Load data when filters or pagination change
   useEffect(() => {
     fetchData();
+  }, [pagination.page, selectedCity, selectedCondition, dateRange, sortBy]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    if (pagination.page !== 1) {
+      setPagination(prev => ({ ...prev, page: 1 }));
+    } else {
+      fetchData();
+    }
+  }, [searchTerm, selectedCity, selectedCondition, dateRange]);
+
+  // Load cities and stats on mount
+  useEffect(() => {
+    fetchCitiesAndStats();
   }, []);
 
- const fetchData = async () => {
-  try {
-    setLoading(true);
-    const [weatherRes, citiesRes, statsRes] = await Promise.all([
-      fetch('/api/admin/weather'),
-      fetch('/api/cities'),
-      fetch('/api/admin/weather/stats')
-    ]);
+  const fetchCitiesAndStats = async () => {
+    try {
+      const [citiesRes, statsRes] = await Promise.all([
+        fetch('/api/cities'),
+        fetch('/api/admin/weather/stats')
+      ]);
 
-    if (!weatherRes.ok || !citiesRes.ok) {
-      throw new Error('Failed to fetch data');
-    }
+      if (citiesRes.ok) {
+        const citiesData = await citiesRes.json();
+        setCities(citiesData);
+      }
 
-    const [weatherResponse, citiesData] = await Promise.all([
-      weatherRes.json(),
-      citiesRes.json()
-    ]);
-
-    let statsData = null;
-    if (statsRes.ok) {
-      statsData = await statsRes.json();
-    }
-
-    // Sửa ở đây: weatherResponse có thể là object với property data
-    const weatherArray = Array.isArray(weatherResponse) 
-      ? weatherResponse 
-      : weatherResponse.data || [];
-    
-    setWeatherData(weatherArray);
-    setCities(citiesData);
-    setStats(statsData);
-  } catch (err) {
-    setError(err instanceof Error ? err.message : 'Failed to load data');
-  } finally {
-    setLoading(false);
-  }
-};
-  const getDateRangeFilter = () => {
-    const now = new Date();
-    switch (dateRange) {
-      case 'today':
-        return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      case 'week':
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        return weekAgo;
-      case 'month':
-        return new Date(now.getFullYear(), now.getMonth(), 1);
-      case 'year':
-        return new Date(now.getFullYear(), 0, 1);
-      default:
-        return null;
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setStats(statsData);
+      }
+    } catch (err) {
+      console.error('Error fetching cities and stats:', err);
     }
   };
 
-  const filteredData = weatherData.filter(item => {
-    const matchesSearch = item.city.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.city.country.toLowerCase().includes(searchTerm.toLowerCase());
+  const buildApiUrl = () => {
+    const params = new URLSearchParams();
+    params.set('page', pagination.page.toString());
+    params.set('limit', pagination.limit.toString());
     
-    const matchesCity = !selectedCity || item.cityId.toString() === selectedCity;
-    const matchesCondition = !selectedCondition || item.condition === selectedCondition;
+    if (selectedCity) params.set('cityId', selectedCity);
+    if (selectedCondition) params.set('condition', selectedCondition);
+    if (dateRange && dateRange !== 'all') params.set('dateRange', dateRange);
+    if (sortBy) params.set('sortBy', sortBy);
     
-    const dateFilter = getDateRangeFilter();
-    const matchesDate = !dateFilter || new Date(item.date) >= dateFilter;
-    
-    return matchesSearch && matchesCity && matchesCondition && matchesDate;
-  }).sort((a, b) => {
-    switch (sortBy) {
-      case 'city':
-        return a.city.name.localeCompare(b.city.name);
-      case 'temp_high':
-        return (b.temperatureHigh || 0) - (a.temperatureHigh || 0);
-      case 'temp_low':
-        return (b.temperatureLow || 0) - (a.temperatureLow || 0);
-      case 'condition':
-        return (a.condition || '').localeCompare(b.condition || '');
-      case 'date':
-      default:
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
+    return `/api/admin/weather?${params.toString()}`;
+  };
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(buildApiUrl());
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch weather data');
+      }
+
+      const result = await response.json();
+      
+      // Handle both array and object response
+      if (result.data && result.pagination) {
+        setWeatherData(result.data);
+        setPagination(result.pagination);
+      } else if (Array.isArray(result)) {
+        setWeatherData(result);
+        setPagination(prev => ({ ...prev, total: result.length, totalPages: 1 }));
+      } else {
+        setWeatherData([]);
+        setPagination(prev => ({ ...prev, total: 0, totalPages: 0 }));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load data');
+      setWeatherData([]);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  // Client-side filtering for search term (since it's not handled by API)
+  const filteredData = weatherData.filter(item => {
+    if (!searchTerm) return true;
+    
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      item.city.name.toLowerCase().includes(searchLower) ||
+      item.city.country.toLowerCase().includes(searchLower)
+    );
   });
 
   const resetForm = () => {
@@ -257,6 +280,7 @@ const AdminWeatherPage = () => {
       }
 
       await fetchData();
+      await fetchCitiesAndStats(); // Refresh stats
       setShowAddModal(false);
       setShowEditModal(false);
       resetForm();
@@ -283,6 +307,7 @@ const AdminWeatherPage = () => {
       }
 
       await fetchData();
+      await fetchCitiesAndStats(); // Refresh stats
       setShowDeleteModal(false);
       setSelectedWeather(null);
     } catch (err) {
@@ -305,6 +330,7 @@ const AdminWeatherPage = () => {
       }
 
       await fetchData();
+      await fetchCitiesAndStats();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sync weather data');
     } finally {
@@ -333,6 +359,12 @@ const AdminWeatherPage = () => {
     }
   };
 
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      setPagination(prev => ({ ...prev, page: newPage }));
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('vi-VN');
   };
@@ -356,7 +388,12 @@ const AdminWeatherPage = () => {
     }
   };
 
-  if (loading) {
+  const getTodayDateString = () => {
+    const today = new Date();
+     return today.toISOString().split('T')[0];
+  };
+
+  if (loading && pagination.page === 1) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -495,7 +532,7 @@ const AdminWeatherPage = () => {
           >
             <option value="">Tất cả thành phố</option>
             {cities.map(city => (
-              <option key={city.id} value={city.id}>
+              <option key={city.id} value={city.id.toString()}>
                 {city.name}, {city.country}
               </option>
             ))}
@@ -539,13 +576,19 @@ const AdminWeatherPage = () => {
           </select>
           
           <div className="text-sm text-gray-600 flex items-center">
-            Hiển thị: {filteredData.length} / {weatherData.length}
+            Hiển thị: {filteredData.length} / {pagination.total}
           </div>
         </div>
       </div>
 
       {/* Weather Data Table */}
       <div className="bg-white shadow rounded-lg overflow-hidden">
+        {loading && pagination.page > 1 && (
+          <div className="p-4 text-center">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+          </div>
+        )}
+        
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -665,13 +708,106 @@ const AdminWeatherPage = () => {
           </table>
         </div>
         
-        {filteredData.length === 0 && (
+        {filteredData.length === 0 && !loading && (
           <div className="text-center py-12">
             <CloudRain className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">Không tìm thấy dữ liệu thời tiết</h3>
             <p className="mt-1 text-sm text-gray-500">
               Thử thay đổi bộ lọc hoặc thêm dữ liệu mới.
             </p>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {pagination.totalPages > 1 && (
+          <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+            <div className="flex-1 flex justify-between sm:hidden">
+              <button
+                onClick={() => handlePageChange(pagination.page - 1)}
+                disabled={pagination.page <= 1}
+                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Trước
+              </button>
+              <button
+                onClick={() => handlePageChange(pagination.page + 1)}
+                disabled={pagination.page >= pagination.totalPages}
+                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Sau
+              </button>
+            </div>
+            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-gray-700">
+                  Hiển thị{' '}
+                  <span className="font-medium">{pagination.total}</span> kết quả
+                </p>
+              </div>
+              <div>
+                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                  <button
+                    onClick={() => handlePageChange(pagination.page - 1)}
+                    disabled={pagination.page <= 1}
+                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  
+                  {/* Page numbers */}
+                  {[...Array(pagination.totalPages)].map((_, index) => {
+                    const pageNum = index + 1;
+                    const isCurrentPage = pageNum === pagination.page;
+                    
+                    // Show first page, last page, current page, and pages around current
+                    if (
+                      pageNum === 1 ||
+                      pageNum === pagination.totalPages ||
+                      (pageNum >= pagination.page - 1 && pageNum <= pagination.page + 1)
+                    ) {
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => handlePageChange(pageNum)}
+                          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                            isCurrentPage
+                              ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                              : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    }
+                    
+                    // Show ellipsis
+                    if (
+                      (pageNum === pagination.page - 2 && pagination.page > 3) ||
+                      (pageNum === pagination.page + 2 && pagination.page < pagination.totalPages - 2)
+                    ) {
+                      return (
+                        <span
+                          key={pageNum}
+                          className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700"
+                        >
+                          ...
+                        </span>
+                      );
+                    }
+                    
+                    return null;
+                  })}
+                  
+                  <button
+                    onClick={() => handlePageChange(pagination.page + 1)}
+                    disabled={pagination.page >= pagination.totalPages}
+                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </nav>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -714,7 +850,7 @@ const AdminWeatherPage = () => {
                       >
                         <option value="">Chọn thành phố</option>
                         {cities.map(city => (
-                          <option key={city.id} value={city.id}>
+                          <option key={city.id} value={city.id.toString()}>
                             {city.name}, {city.country}
                           </option>
                         ))}
@@ -729,6 +865,7 @@ const AdminWeatherPage = () => {
                         type="date"
                         value={formData.date}
                         onChange={(e) => setFormData({...formData, date: e.target.value})}
+                        max={getTodayDateString()}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         required
                       />
@@ -743,6 +880,8 @@ const AdminWeatherPage = () => {
                       <input
                         type="number"
                         step="0.1"
+                        min="-50"
+                        max="60"
                         value={formData.temperatureHigh}
                         onChange={(e) => setFormData({...formData, temperatureHigh: e.target.value})}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -757,6 +896,8 @@ const AdminWeatherPage = () => {
                       <input
                         type="number"
                         step="0.1"
+                        min="-50"
+                        max="60"
                         value={formData.temperatureLow}
                         onChange={(e) => setFormData({...formData, temperatureLow: e.target.value})}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -823,6 +964,7 @@ const AdminWeatherPage = () => {
                       <input
                         type="number"
                         min="0"
+                        max="200"
                         step="0.1"
                         value={formData.windSpeed}
                         onChange={(e) => setFormData({...formData, windSpeed: e.target.value})}
@@ -916,4 +1058,4 @@ const AdminWeatherPage = () => {
   );
 };
 
-export default AdminWeatherPage;
+export default AdminWeatherPage; 
