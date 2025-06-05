@@ -30,6 +30,7 @@ export async function GET(request: NextRequest, { params }: Params) {
             name: true,
             address: true,
             rating: true,
+            imageUrl: true,
             category: {
               select: {
                 name: true

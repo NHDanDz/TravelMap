@@ -90,6 +90,12 @@ export const Navbar = () => {
             Bản đồ
           </Link>
           <Link 
+            href="/cities" 
+            className={`font-medium hover:text-blue-500 transition-colors text-gray-700`}
+          >
+            Thành phố
+          </Link>
+          <Link 
             href="/trip-planner" 
             className={`font-medium hover:text-blue-500 transition-colors text-gray-700`}
           >
