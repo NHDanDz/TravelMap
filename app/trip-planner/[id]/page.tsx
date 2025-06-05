@@ -17,7 +17,7 @@ import {
   Award, Target, Sparkles, Timer, Route, Activity, 
   Globe, RefreshCw, Bell, Bookmark, ExternalLink, Building2, 
   ShoppingBag, Umbrella, Trees, Music2, ChevronDown,
-  X
+  X, Loader2
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import EnhancedPlaceSearchPanel from '@/app/trip-planner/components/EnhancedPlaceSearchPanel';
@@ -124,6 +124,24 @@ interface Trip {
   travelCompanions?: number;
 }
 
+interface DatabasePlace {
+  id: number;
+  name: string;
+  address: string;
+  description?: string;
+  latitude: number;
+  longitude: number;
+  imageUrl?: string;
+  openingHours?: string;
+  contactInfo?: string;
+  website?: string;
+  avgDurationMinutes?: number;
+  priceLevel?: string;
+  rating?: number;
+  category?: Category;
+  photos?: Photo[];
+}
+
 // Weather icon mapping
 const getWeatherIcon = (condition: string) => {
   switch (condition) {
@@ -135,22 +153,20 @@ const getWeatherIcon = (condition: string) => {
   }
 };
 
-// Place type configuration with fallback for missing icons
+// Place type configuration
 const placeTypeConfig = {
-  tourist_attraction: { icon: Landmark, color: 'bg-green-100 text-green-800', label: 'Địa điểm tham quan du lịch' },
-  restaurant: { icon: Utensils, color: 'bg-red-100 text-red-800', label: 'Nhà hàng và quán ăn' },
+  tourist_attraction: { icon: Landmark, color: 'bg-green-100 text-green-800', label: 'Địa điểm tham quan' },
+  restaurant: { icon: Utensils, color: 'bg-red-100 text-red-800', label: 'Nhà hàng' },
   cafe: { icon: Coffee, color: 'bg-amber-100 text-amber-800', label: 'Quán cà phê' },
-  hotel: { icon: Building2, color: 'bg-blue-100 text-blue-800', label: 'Khách sạn và nơi lưu trú' },
-  shopping: { icon: ShoppingBag, color: 'bg-purple-100 text-purple-800', label: 'Trung tâm mua sắm và chợ' },
-  museum: { icon: Building, color: 'bg-indigo-100 text-indigo-800', label: 'Bảo tàng và triển lãm' },
+  hotel: { icon: Building2, color: 'bg-blue-100 text-blue-800', label: 'Khách sạn' },
+  shopping: { icon: ShoppingBag, color: 'bg-purple-100 text-purple-800', label: 'Mua sắm' },
+  museum: { icon: Building, color: 'bg-indigo-100 text-indigo-800', label: 'Bảo tàng' },
   beach: { icon: Umbrella, color: 'bg-cyan-100 text-cyan-800', label: 'Bãi biển' },
-  nature: { icon: Trees, color: 'bg-emerald-100 text-emerald-800', label: 'Công viên và thiên nhiên' },
-  entertainment: { icon: Music2, color: 'bg-pink-100 text-pink-800', label: 'Giải trí và vui chơi' }
+  nature: { icon: Trees, color: 'bg-emerald-100 text-emerald-800', label: 'Thiên nhiên' },
+  entertainment: { icon: Music2, color: 'bg-pink-100 text-pink-800', label: 'Giải trí' }
 };
 
-// Helper function to get place type info with fallback
-const getPlaceTypeInfo = (place: Place) => {
-  // First try to use the category from the place
+const getPlaceTypeInfo = (place: Place | { category?: Category; type?: string }) => {
   if (place.category?.name) {
     const categoryName = place.category.name.toLowerCase().replace(/\s+/g, '_');
     if (categoryName in placeTypeConfig) {
@@ -158,84 +174,12 @@ const getPlaceTypeInfo = (place: Place) => {
     }
   }
   
-  // Fallback to place.type
-  if (place.type && place.type in placeTypeConfig) {
+  if ('type' in place && place.type && place.type in placeTypeConfig) {
     return placeTypeConfig[place.type as keyof typeof placeTypeConfig];
   }
   
-  // Default fallback
   return placeTypeConfig.tourist_attraction;
 };
-
-// Enhanced Day Stats with map integration
-const DayStatsWithMap = ({ day, tripId }: { day: Day; tripId: string }) => {
-  const placesWithCoordinates = day.places.filter(place => 
-    place.latitude && place.longitude && 
-    parseFloat(place.latitude) !== 0 && parseFloat(place.longitude) !== 0
-  );
-  
-  return (
-    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold">Ngày {day.dayNumber}</h2>
-          <p className="text-blue-100">{new Date(day.date).toLocaleDateString('vi-VN', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}</p>
-        </div>
-        <div className="text-right">
-          <div className="text-2xl font-bold">{day.places.length}</div>
-          <div className="text-sm text-blue-100">địa điểm</div>
-          <div className="text-xs text-blue-200 mt-1">
-            {placesWithCoordinates.length} có tọa độ
-          </div>
-        </div>
-      </div>
-      
-      {/* Quick Map View Button */}
-      {placesWithCoordinates.length > 0 && (
-        <div className="mt-4 flex space-x-2">
-          <Link
-            href={`/trip-planner/${tripId}/map?day=${day.dayNumber}`}
-            className="inline-flex items-center space-x-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
-          >
-            <Map className="w-4 h-4" />
-            <span className="text-sm font-medium">Xem trên bản đồ</span>
-          </Link>
-          
-          {placesWithCoordinates.length >= 2 && (
-            <Link
-              href={`/trip-planner/${tripId}/map?day=${day.dayNumber}&route=true`}
-              className="inline-flex items-center space-x-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
-            >
-              <Route className="w-4 h-4" />
-              <span className="text-sm font-medium">Xem tuyến đường</span>
-            </Link>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Floating Map Action Button (add to main content area)
-const FloatingMapButton = ({ tripId, activeDay }: { tripId: string; activeDay: number }) => {
-  return (
-    <div className="fixed bottom-6 right-6 z-50">
-      <Link
-        href={`/trip-planner/${tripId}/map?day=${activeDay}`}
-        className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-medium"
-      >
-        <Map className="w-5 h-5" />
-        <span>Xem bản đồ</span>
-      </Link>
-    </div>
-  );
-};
-
 
 // Price level indicators
 const getPriceLevelIndicator = (level?: number) => {
@@ -266,12 +210,10 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'succes
   
   document.body.appendChild(toast);
   
-  // Animate in
   setTimeout(() => {
     toast.style.transform = 'translateX(0)';
   }, 100);
   
-  // Remove after delay
   setTimeout(() => {
     toast.style.transform = 'translateX(100%)';
     setTimeout(() => {
@@ -282,7 +224,7 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'succes
   }, 3000);
 };
 
-// Modern loading component
+// Loading component
 const LoadingSpinner = () => (
   <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
     <div className="text-center">
@@ -298,7 +240,7 @@ const LoadingSpinner = () => (
   </div>
 );
 
-// Enhanced Status Badge Component
+// Status Badge Component
 const StatusBadge = ({ status, isEditing, onStatusChange, quickChange = false }: {
   status: 'draft' | 'planned' | 'completed';
   isEditing: boolean;
@@ -392,7 +334,7 @@ const StatusBadge = ({ status, isEditing, onStatusChange, quickChange = false }:
   );
 };
 
-// Enhanced place card component
+// Place card component
 const PlaceCard = ({ place, dayNumber, isEditing, onUpdate, onRemove, tripId }: {
   place: Place;
   dayNumber: number;
@@ -408,7 +350,8 @@ const PlaceCard = ({ place, dayNumber, isEditing, onUpdate, onRemove, tripId }: 
 
   const photos = place.photos || [{ id: 1, url: place.image, isPrimary: true, caption: place.name }];
   const hasValidCoordinates = place.latitude && place.longitude && 
-  parseFloat(place.latitude) !== 0 && parseFloat(place.longitude) !== 0;
+    parseFloat(place.latitude) !== 0 && parseFloat(place.longitude) !== 0;
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-lg transition-all duration-300">
       {/* Image Gallery */}
@@ -446,7 +389,15 @@ const PlaceCard = ({ place, dayNumber, isEditing, onUpdate, onRemove, tripId }: 
           </>
         )}
 
-        {/* Quick actions overlay */}
+        {/* Rating badge */}
+        {place.rating && (
+          <div className="absolute top-3 left-3 bg-white/95 rounded-full px-2 py-1 flex items-center space-x-1 backdrop-blur-sm">
+            <Star className="w-3 h-3 text-yellow-500 fill-current" />
+            <span className="text-xs font-semibold text-gray-800">{place.rating.toFixed(1)}</span>
+          </div>
+        )}
+
+        {/* Quick actions */}
         <div className="absolute top-3 right-3 flex space-x-2">
           <button className="w-8 h-8 bg-white/90 rounded-full flex items-center justify-center hover:bg-white transition-colors">
             <Heart className="w-4 h-4 text-gray-600" />
@@ -458,14 +409,6 @@ const PlaceCard = ({ place, dayNumber, isEditing, onUpdate, onRemove, tripId }: 
             <Eye className="w-4 h-4 text-gray-600" />
           </button>
         </div>
-
-        {/* Rating badge */}
-        {place.rating && (
-          <div className="absolute top-3 left-3 bg-white/95 rounded-full px-2 py-1 flex items-center space-x-1 backdrop-blur-sm">
-            <Star className="w-3 h-3 text-yellow-500 fill-current" />
-            <span className="text-xs font-semibold text-gray-800">{place.rating.toFixed(1)}</span>
-          </div>
-        )}
       </div>
 
       {/* Content */}
@@ -596,7 +539,6 @@ const PlaceCard = ({ place, dayNumber, isEditing, onUpdate, onRemove, tripId }: 
             </div>
           )}
           
-          {/* View on Map button */}
           {hasValidCoordinates && (
             <Link
               href={`/trip-planner/${tripId}/map?day=${dayNumber}&place=${place.id}`}
@@ -609,7 +551,7 @@ const PlaceCard = ({ place, dayNumber, isEditing, onUpdate, onRemove, tripId }: 
         </div>
       </div>
 
-      {/* Detailed view modal overlay */}
+      {/* Detailed view modal */}
       {showDetails && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowDetails(false)}>
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
@@ -707,8 +649,23 @@ const WeatherCard = ({ weather, date }: { weather?: WeatherData; date: string })
   );
 };
 
+// Floating Map Button
+const FloatingMapButton = ({ tripId, activeDay }: { tripId: string; activeDay: number }) => {
+  return (
+    <div className="fixed bottom-6 right-6 z-50">
+      <Link
+        href={`/trip-planner/${tripId}/map?day=${activeDay}`}
+        className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-medium"
+      >
+        <Map className="w-5 h-5" />
+        <span>Xem bản đồ</span>
+      </Link>
+    </div>
+  );
+};
+
 // Main component
-export default function ModernTripDetailsPage() {
+export default function TripDetailsPage() {
   const router = useRouter();
   const params = useParams();
   const tripId = params.id as string;
@@ -721,30 +678,29 @@ export default function ModernTripDetailsPage() {
   const [showAddPlaceModal, setShowAddPlaceModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showOptimizerModal, setShowOptimizerModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [saving, setSaving] = useState(false);
+  
+  // Place suggestions states
+  const [showPlaceSuggestions, setShowPlaceSuggestions] = useState(false);
+  const [suggestedPlaces, setSuggestedPlaces] = useState<DatabasePlace[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [selectedDayForPlace, setSelectedDayForPlace] = useState<number>(1);
  
-  // Load trip data with enhanced weather handling
+  // Load trip data
   useEffect(() => {
     const loadTripData = async () => {
       try {
         setLoading(true);
         
-        // Load trip data
         const tripData = await fetch(`/api/trips/${tripId}`)
           .then(response => {
             if (!response.ok) throw new Error('Failed to fetch trip');
             return response.json();
           });
 
-        console.log('Trip data loaded:', tripData);
-
-        // Load weather data for each day if city exists
+        // Load weather data if city exists
         if (tripData.city?.id) {
-          console.log(`Loading weather data for city: ${tripData.city.name} (ID: ${tripData.city.id})`);
-          
           try {
-            // Load individual weather data for each day
             const daysWithWeather = await Promise.all(
               tripData.days.map(async (day: any) => {
                 try {
@@ -754,14 +710,11 @@ export default function ModernTripDetailsPage() {
                   
                   if (weatherResponse.ok) {
                     const weatherData = await weatherResponse.json();
-                    console.log(`Weather data loaded for ${day.date}:`, weatherData);
                     return { ...day, weather: weatherData };
                   } else {
-                    console.warn(`Failed to load weather for ${day.date}:`, weatherResponse.status);
                     return day;
                   }
                 } catch (error) {
-                  console.error(`Error loading weather for day ${day.dayNumber}:`, error);
                   return day;
                 }
               })
@@ -769,11 +722,9 @@ export default function ModernTripDetailsPage() {
             
             setTrip({ ...tripData, days: daysWithWeather });
           } catch (weatherError) {
-            console.error('Error with weather data handling:', weatherError);
             setTrip(tripData);
           }
         } else {
-          console.log('No city data available, loading trip without weather');
           setTrip(tripData);
         }
       } catch (error) {
@@ -790,13 +741,61 @@ export default function ModernTripDetailsPage() {
     }
   }, [tripId]);
 
+  // Check for showSuggestions parameter
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('showSuggestions') === 'true') {
+        setShowPlaceSuggestions(true);
+        // Remove parameter from URL
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, []);
+
+  // Load suggested places when modal opens
+  useEffect(() => {
+    if (showPlaceSuggestions && trip) {
+      loadSuggestedPlaces();
+    }
+  }, [showPlaceSuggestions, trip]);
+
+  // Load suggested places from database
+  const loadSuggestedPlaces = async () => {
+    try {
+      setLoadingSuggestions(true);
+      
+      let url = '/api/places?limit=20';
+      
+      if (trip?.city?.id) {
+        url += `&city=${trip.city.name}`;
+      } else {
+        url += `&search=${trip?.destination}`;
+      }
+      
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        setSuggestedPlaces(data.places || []);
+      } else {
+        setSuggestedPlaces([]);
+      }
+    } catch (error) {
+      console.error('Error loading suggested places:', error);
+      setSuggestedPlaces([]);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
   // Handle status change
   const handleStatusChange = (newStatus: 'draft' | 'planned' | 'completed') => {
     if (!trip) return;
     setTrip({ ...trip, status: newStatus });
   };
 
-  // Handle quick status change (with API call)
+  // Handle quick status change with API call
   const handleQuickStatusChange = async (newStatus: 'draft' | 'planned' | 'completed') => {
     if (!trip) return;
     
@@ -816,7 +815,7 @@ export default function ModernTripDetailsPage() {
     } catch (error) {
       console.error('Error updating status:', error);
       showToast('Lỗi khi cập nhật trạng thái!', 'error');
-      throw error; // Re-throw to handle in StatusBadge
+      throw error;
     }
   };
 
@@ -897,29 +896,165 @@ export default function ModernTripDetailsPage() {
     setTrip({ ...trip, days: newDays });
   };
 
-  // Handle save
-  const handleSave = async () => {
+  // Handle add suggested place
+  const handleAddSuggestedPlace = (dbPlace: DatabasePlace, dayNumber: number) => {
     if (!trip) return;
     
-    try {
-      setSaving(true);
-      const response = await fetch(`/api/trips/${tripId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(trip)
-      });
-      
-      if (!response.ok) throw new Error('Failed to save trip');
-      
-      setIsEditing(false);
-      showToast('Lịch trình đã được lưu thành công!', 'success');
-    } catch (error) {
-      console.error('Error saving trip:', error);
-      showToast('Lỗi khi lưu lịch trình!', 'error');
-    } finally {
-      setSaving(false);
+    const convertedPlace: Place = {
+      id: `place_${dbPlace.id}_${Date.now()}`,
+      name: dbPlace.name,
+      type: dbPlace.category?.name || 'tourist_attraction',
+      address: dbPlace.address || '',
+      latitude: dbPlace.latitude?.toString() || '0',
+      longitude: dbPlace.longitude?.toString() || '0',
+      image: dbPlace.photos?.[0]?.url || dbPlace.imageUrl || '/images/place-default.jpg',
+      rating: dbPlace.rating ? parseFloat(dbPlace.rating.toString()) : undefined,
+      category: dbPlace.category,
+      photos: dbPlace.photos,
+      description: dbPlace.description,
+      openingHours: dbPlace.openingHours,
+      avgDurationMinutes: dbPlace.avgDurationMinutes,
+      priceLevel: dbPlace.priceLevel ? parseInt(dbPlace.priceLevel) : undefined,
+      website: dbPlace.website,
+      contactInfo: dbPlace.contactInfo
+    };
+    
+    const dayIndex = trip.days.findIndex(day => day.dayNumber === dayNumber);
+    if (dayIndex !== -1) {
+      const newDays = [...trip.days];
+      newDays[dayIndex] = {
+        ...newDays[dayIndex],
+        places: [...newDays[dayIndex].places, convertedPlace]
+      };
+      setTrip({ ...trip, days: newDays });
+      showToast(`Đã thêm ${dbPlace.name} vào ngày ${dayNumber}!`, 'success');
     }
   };
+
+  // Handle save
+// Replace the existing handleSave function with this improved version
+const handleSave = async () => {
+  if (!trip) return;
+  
+  try {
+    setSaving(true);
+    
+    // Helper function to safely include non-null/non-empty values
+    const includeIfValid = (value: any, validator?: (val: any) => boolean) => {
+      if (value === null || value === undefined || value === '') return undefined;
+      if (validator && !validator(value)) return undefined;
+      return value;
+    };
+
+    // Helper to validate URL
+    const isValidUrl = (url: string) => {
+      try {
+        new URL(url);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    // Transform trip data to match the API schema
+    const tripUpdateData: any = {};
+    
+    // Only include fields that have valid values
+    if (trip.name && trip.name.trim()) tripUpdateData.name = trip.name.trim();
+    if (trip.destination && trip.destination.trim()) tripUpdateData.destination = trip.destination.trim();
+    if (trip.startDate) tripUpdateData.startDate = trip.startDate;
+    if (trip.endDate) tripUpdateData.endDate = trip.endDate;
+    if (trip.description !== null && trip.description !== undefined) tripUpdateData.description = trip.description;
+    if (trip.status) tripUpdateData.status = trip.status;
+    
+    // Only include coverImage if it's a valid URL
+    const coverImageValue = trip.coverImage || trip.city?.imageUrl;
+    if (coverImageValue && isValidUrl(coverImageValue)) {
+      tripUpdateData.coverImage = coverImageValue;
+    }
+
+    // Process days and places
+    if (trip.days && trip.days.length > 0) {
+      tripUpdateData.days = trip.days.map(day => {
+        const dayData: any = {
+          dayNumber: day.dayNumber,
+          date: day.date,
+        };
+        
+        // Only include notes if not empty
+        if (day.notes && day.notes.trim()) {
+          dayData.notes = day.notes.trim();
+        }
+        
+        // Process places - only include places with required fields
+        dayData.places = day.places
+          .filter(place => {
+            // Must have name, latitude, and longitude
+            return place.name && 
+                   place.latitude && 
+                   place.longitude && 
+                   place.latitude !== '0' && 
+                   place.longitude !== '0' &&
+                   place.name.trim() !== '';
+          })
+          .map((place, index) => {
+            const placeData: any = {
+              name: place.name.trim(),
+              latitude: place.latitude.toString(),
+              longitude: place.longitude.toString(),
+            };
+            
+            // Optional fields - only include if they have valid values
+            if (place.id) placeData.id = place.id;
+            if (place.type && place.type.trim()) placeData.type = place.type.trim();
+            if (place.address && place.address.trim()) placeData.address = place.address.trim();
+            if (place.image && place.image.trim()) placeData.image = place.image.trim();
+            if (place.startTime && /^\d{2}:\d{2}$/.test(place.startTime)) placeData.startTime = place.startTime;
+            if (place.endTime && /^\d{2}:\d{2}$/.test(place.endTime)) placeData.endTime = place.endTime;
+            if (place.duration && place.duration > 0) placeData.duration = place.duration;
+            if (place.notes && place.notes.trim()) placeData.notes = place.notes.trim();
+            if (place.rating && place.rating >= 0 && place.rating <= 5) placeData.rating = place.rating;
+            if (place.openingHours && place.openingHours.trim()) placeData.openingHours = place.openingHours.trim();
+            if (place.description && place.description.trim()) placeData.description = place.description.trim();
+            
+            return placeData;
+          });
+        
+        return dayData;
+      });
+    }
+
+    console.log('Sending trip data:', JSON.stringify(tripUpdateData, null, 2));
+
+    const response = await fetch(`/api/trips/${tripId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(tripUpdateData)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('API Error:', errorData);
+      throw new Error(errorData.error || 'Failed to save trip');
+    }
+    
+    const result = await response.json();
+    console.log('Save successful:', result);
+    
+    // Update local trip state with the returned data if available
+    if (result.trip) {
+      setTrip(result.trip);
+    }
+    
+    setIsEditing(false);
+    showToast('Lịch trình đã được lưu thành công!', 'success');
+  } catch (error) {
+    console.error('Error saving trip:', error);
+    showToast('Lỗi khi lưu lịch trình!', 'error');
+  } finally {
+    setSaving(false);
+  }
+};
 
   // Handle share
   const handleShare = (type: 'link' | 'pdf') => {
@@ -927,7 +1062,6 @@ export default function ModernTripDetailsPage() {
       navigator.clipboard.writeText(window.location.href);
       showToast('Đã sao chép liên kết!', 'success');
     } else {
-      // Navigate to print page
       router.push(`/trip-planner/${tripId}/print`);
     }
     setShowShareModal(false);
@@ -960,7 +1094,7 @@ export default function ModernTripDetailsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      {/* Modern Header */}
+      {/* Header */}
       <header className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
@@ -1010,7 +1144,7 @@ export default function ModernTripDetailsPage() {
                 </button>
               </div>
 
-              {/* Quick status change for non-editing mode */}
+              {/* Quick status change */}
               {!isEditing && (
                 <div className="flex items-center space-x-1 bg-gray-100 rounded-xl p-1">
                   <StatusBadge 
@@ -1030,6 +1164,7 @@ export default function ModernTripDetailsPage() {
               >
                 <Sparkles className="w-5 h-5" />
               </button>
+              
               <Link
                 href={`/trip-planner/${tripId}/map`}
                 className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
@@ -1037,6 +1172,7 @@ export default function ModernTripDetailsPage() {
               >
                 <Map className="w-5 h-5" />
               </Link>
+              
               <button
                 onClick={() => setShowShareModal(true)}
                 className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
@@ -1200,7 +1336,6 @@ export default function ModernTripDetailsPage() {
                   <span className="font-semibold">{(trip.days.reduce((sum, day) => sum + day.places.length, 0) / trip.numDays).toFixed(1)}</span>
                 </div>
                 
-                {/* Status display in statistics */}
                 <div className="flex justify-between items-center pt-2 border-t border-gray-100">
                   <span className="text-sm text-gray-600">Trạng thái</span>
                   <StatusBadge 
@@ -1216,6 +1351,19 @@ export default function ModernTripDetailsPage() {
                   </div>
                 )}
               </div>
+              
+              {/* Show suggestions button if no places */}
+              {trip.days.reduce((sum, day) => sum + day.places.length, 0) === 0 && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <button
+                    onClick={() => setShowPlaceSuggestions(true)}
+                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>Gợi ý địa điểm</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1240,6 +1388,27 @@ export default function ModernTripDetailsPage() {
                       <div className="text-sm text-blue-100">địa điểm</div>
                     </div>
                   </div>
+                  
+                  {/* Quick actions in header */}
+                  <div className="mt-4 flex space-x-2">
+                    <Link
+                      href={`/trip-planner/${tripId}/map?day=${currentDay.dayNumber}`}
+                      className="inline-flex items-center space-x-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+                    >
+                      <Map className="w-4 h-4" />
+                      <span className="text-sm font-medium">Xem trên bản đồ</span>
+                    </Link>
+                    
+                    {currentDay.places.length === 0 && (
+                      <button
+                        onClick={() => setShowPlaceSuggestions(true)}
+                        className="inline-flex items-center space-x-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        <span className="text-sm font-medium">Gợi ý địa điểm</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Places Content */}
@@ -1251,13 +1420,22 @@ export default function ModernTripDetailsPage() {
                       </div>
                       <h3 className="text-xl font-semibold text-gray-800 mb-2">Chưa có địa điểm nào</h3>
                       <p className="text-gray-600 mb-6">Thêm địa điểm để bắt đầu lên kế hoạch cho ngày này</p>
-                      <button
-                        onClick={() => setShowAddPlaceModal(true)}
-                        className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-medium"
-                      >
-                        <Plus className="w-5 h-5 mr-2" />
-                        <span>Thêm địa điểm</span>
-                      </button>
+                      <div className="flex justify-center space-x-3">
+                        <button
+                          onClick={() => setShowPlaceSuggestions(true)}
+                          className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all duration-200 font-medium"
+                        >
+                          <Sparkles className="w-5 h-5 mr-2" />
+                          <span>Xem gợi ý</span>
+                        </button>
+                        <button
+                          onClick={() => setShowAddPlaceModal(true)}
+                          className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-medium"
+                        >
+                          <Plus className="w-5 h-5 mr-2" />
+                          <span>Tìm kiếm địa điểm</span>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <DragDropContext onDragEnd={handleDragEnd}>
@@ -1330,7 +1508,6 @@ export default function ModernTripDetailsPage() {
           <div className="w-full max-w-4xl max-h-[90vh]">
             <EnhancedPlaceSearchPanel
               onAddPlace={(place, dayNumber) => {
-                // Find the day and add the place
                 const dayIndex = trip!.days.findIndex(day => day.dayNumber === dayNumber);
                 if (dayIndex !== -1) {
                   const newDays = [...trip!.days];
@@ -1405,6 +1582,158 @@ export default function ModernTripDetailsPage() {
           onClose={() => setShowOptimizerModal(false)}
         />
       )}
+
+      {/* Place Suggestions Modal */}
+      {showPlaceSuggestions && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Gợi ý địa điểm cho {trip?.destination}</h2>
+                  <p className="text-sm text-gray-600 mt-1">Chọn các địa điểm bạn muốn thêm vào lịch trình</p>
+                </div>
+                <button 
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+                  onClick={() => setShowPlaceSuggestions(false)}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              {/* Day selector */}
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Thêm vào ngày:</label>
+                <div className="flex space-x-2">
+                  {trip.days.map(day => (
+                    <button
+                      key={day.dayNumber}
+                      onClick={() => setSelectedDayForPlace(day.dayNumber)}
+                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                        selectedDayForPlace === day.dayNumber
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      Ngày {day.dayNumber}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6 max-h-[70vh] overflow-y-auto">
+              {loadingSuggestions ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-2" />
+                    <p className="text-gray-600">Đang tải gợi ý địa điểm...</p>
+                  </div>
+                </div>
+              ) : suggestedPlaces.length === 0 ? (
+                <div className="text-center py-12">
+                  <MapPin className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-800 mb-2">Không tìm thấy địa điểm</h3>
+                  <p className="text-gray-600 mb-6">Không có địa điểm nào phù hợp với điểm đến của bạn trong cơ sở dữ liệu.</p>
+                  <button
+                    onClick={() => {
+                      setShowPlaceSuggestions(false);
+                      setShowAddPlaceModal(true);
+                    }}
+                    className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-medium"
+                  >
+                    <Plus className="w-5 h-5 mr-2" />
+                    <span>Tìm kiếm địa điểm khác</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {suggestedPlaces.map(place => (
+                    <div key={place.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow">
+                      <div className="relative h-48">
+                        <Image
+                          src={place.photos?.[0]?.url || place.imageUrl || '/images/place-default.jpg'}
+                          alt={place.name}
+                          fill
+                          className="object-cover"
+                        />
+                        {place.rating && (
+                          <div className="absolute top-3 left-3 bg-white/95 rounded-full px-2 py-1 flex items-center space-x-1 backdrop-blur-sm">
+                            <Star className="w-3 h-3 text-yellow-500 fill-current" />
+                            <span className="text-xs font-semibold text-gray-800">{place.rating}</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="p-4">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <div className={`p-1.5 rounded-lg ${getPlaceTypeInfo({ category: place.category, type: place.category?.name }).color}`}>
+                            {React.createElement(getPlaceTypeInfo({ category: place.category, type: place.category?.name }).icon, { className: "w-4 h-4" })}
+                          </div>
+                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${getPlaceTypeInfo({ category: place.category, type: place.category?.name }).color}`}>
+                            {place.category?.name || 'Địa điểm'}
+                          </span>
+                        </div>
+                        
+                        <h3 className="font-bold text-gray-900 text-sm leading-tight mb-1">{place.name}</h3>
+                        <p className="text-xs text-gray-600 mb-3 line-clamp-2">{place.address}</p>
+                        
+                        <div className="flex justify-between items-center">
+                          <div className="text-xs text-gray-500">
+                            {place.avgDurationMinutes && (
+                              <span>{Math.floor(place.avgDurationMinutes / 60)}h {place.avgDurationMinutes % 60}m</span>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleAddSuggestedPlace(place, selectedDayForPlace)}
+                            className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
+                          >
+                            Thêm
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="p-6 border-t border-gray-200 bg-gray-50">
+              <div className="flex justify-between items-center">
+                <button
+                  onClick={() => {
+                    setShowPlaceSuggestions(false);
+                    setShowAddPlaceModal(true);
+                  }}
+                  className="inline-flex items-center px-4 py-2 text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                  <Search className="w-4 h-4 mr-2" />
+                  <span>Tìm kiếm địa điểm khác</span>
+                </button>
+                
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowPlaceSuggestions(false)}
+                    className="px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowPlaceSuggestions(false);
+                      setIsEditing(true);
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Tiếp tục chỉnh sửa
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <FloatingMapButton tripId={tripId} activeDay={activeDay} />
     </div>
   );
