@@ -3,9 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Search, Star, Eye, Trash2, Flag, CheckCircle, XCircle,
-  Filter, Calendar, User, MapPin, MessageSquare, AlertTriangle,
-  ThumbsUp, ThumbsDown, MoreVertical, X, AlertCircle
+  Search, Star, Eye, Trash2, CheckCircle, XCircle, Calendar, User, MapPin, MessageSquare, AlertTriangle, X, AlertCircle
 } from 'lucide-react';
 
 interface Review {

@@ -75,7 +75,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         }
       }
     });
-
+    console.log('City details:', city);
     if (!city) {
       return NextResponse.json(
         { error: 'City not found' },

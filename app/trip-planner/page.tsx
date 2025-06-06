@@ -7,12 +7,12 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { 
   Calendar, Plus, Search, Clock, MapPin, ChevronRight, 
-  MoreHorizontal, Trash2, Edit, Share, Compass, Map, Heart, User,
+  MoreHorizontal, Trash2, Edit, Share, 
   Sparkles, Loader2, Globe, Users, DollarSign, Tag
 } from 'lucide-react';
 import { TripService } from '@/services/tripService';
 import { AuthService } from '@/lib/auth';
-import { Trip, Day, Place, CreateTripRequest } from '@/types/trip';
+import { Trip, Day, Place } from '@/types/trip';
 import SharedLayout from '@/app/components/layout/SharedLayout';
 
 // Service imports

@@ -5,8 +5,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { 
-  MapPin, Search, Filter, Grid, List, Calendar, Users, 
-  User, Clock, Star, Plus, Eye, Edit, Trash2, MoreVertical
+  MapPin, Search, Grid, List, Calendar, Users, 
+  Clock, Plus, Eye, Edit, Trash2, MoreVertical
 } from 'lucide-react';
 import SharedLayout from '../components/layout/SharedLayout';
 import { AuthService } from '@/lib/auth';

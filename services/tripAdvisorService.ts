@@ -1,4 +1,4 @@
-// TripAdvisorService.ts (Coordinate Fix)
+// TripAdvisorService.ts (Đã sửa lỗi ESLint)
 import { Place, PlaceType } from '@/app/dashboard/Map/types';
 
 export interface TripAdvisorSearchOptions {
@@ -9,6 +9,37 @@ export interface TripAdvisorSearchOptions {
   language?: string;
 }
 
+// Định nghĩa interface cho response từ TripAdvisor API
+interface TripAdvisorLocation {
+  location_id: string;
+  name: string;
+  latitude?: string;
+  longitude?: string;
+  rating?: string;
+  distance?: string;
+  bearing?: string;
+  address_obj?: {
+    address_string?: string;
+  };
+  web_url?: string;
+  write_review?: string;
+  photo?: unknown;
+  description?: string;
+  category?: {
+    name: string;
+  };
+  subcategory?: Array<{
+    name: string;
+    localized_name?: string;
+  }>;
+  phone?: string;
+  website?: string;
+}
+
+interface TripAdvisorSearchResponse {
+  data: TripAdvisorLocation[];
+}
+
 export class TripAdvisorService {
   private static readonly API_BASE_URL = 'https://api.content.tripadvisor.com/api/v1';
   private static readonly API_KEY = process.env.NEXT_PUBLIC_TRIPADVISOR_API_KEY;
@@ -16,81 +47,78 @@ export class TripAdvisorService {
   /**
    * Tìm kiếm địa điểm gần đó dựa trên TripAdvisor API
    */
-/**
-   * Tìm kiếm địa điểm gần đó dựa trên TripAdvisor API
-   */
-static async searchPlaces(options: TripAdvisorSearchOptions): Promise<Place[]> {
-  try {
-    // Kiểm tra API key
-    if (!this.API_KEY) {
-      console.error('Missing TripAdvisor API key');
-      throw new Error('Thiếu API key TripAdvisor');
-    }
-
-    // Format tọa độ theo yêu cầu của TripAdvisor
-    const latLong = `${options.latitude},${options.longitude}`;
-    
-    // Chuyển đổi từ PlaceType sang category của TripAdvisor
-    const category = this.mapPlaceTypeToCategory(options.type);
-    
-    // Xây dựng URL với các tham số
-    const url = new URL(`${this.API_BASE_URL}/location/nearby_search`);
-    
-    // Thêm API key vào query parameters (theo tài liệu TripAdvisor)
-    url.searchParams.append('key', this.API_KEY);
-    
-    // Thêm các tham số khác
-    url.searchParams.append('latLong', latLong);
-    url.searchParams.append('category', category);
-    
-    if (options.radius) {
-      url.searchParams.append('radius', options.radius.toString());
-      url.searchParams.append('radiusUnit', 'km');
-    }
-    
-    if (options.language) {
-      url.searchParams.append('language', options.language);
-    }
-    
-    console.log(`Searching TripAdvisor for ${category} near ${latLong}`);
-    console.log('API URL (hiding key):', url.toString().replace(this.API_KEY, 'API_KEY_HIDDEN'));
-    
-    // Gọi API TripAdvisor
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json'
+  static async searchPlaces(options: TripAdvisorSearchOptions): Promise<Place[]> {
+    try {
+      // Kiểm tra API key
+      if (!this.API_KEY) {
+        console.error('Missing TripAdvisor API key');
+        throw new Error('Thiếu API key TripAdvisor');
       }
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('TripAdvisor API error:', errorText);
-      throw new Error(`Lỗi API TripAdvisor: ${response.status}`);
+
+      // Format tọa độ theo yêu cầu của TripAdvisor
+      const latLong = `${options.latitude},${options.longitude}`;
+      
+      // Chuyển đổi từ PlaceType sang category của TripAdvisor
+      const category = this.mapPlaceTypeToCategory(options.type);
+      
+      // Xây dựng URL với các tham số
+      const url = new URL(`${this.API_BASE_URL}/location/nearby_search`);
+      
+      // Thêm API key vào query parameters (theo tài liệu TripAdvisor)
+      url.searchParams.append('key', this.API_KEY);
+      
+      // Thêm các tham số khác
+      url.searchParams.append('latLong', latLong);
+      url.searchParams.append('category', category);
+      
+      if (options.radius) {
+        url.searchParams.append('radius', options.radius.toString());
+        url.searchParams.append('radiusUnit', 'km');
+      }
+      
+      if (options.language) {
+        url.searchParams.append('language', options.language);
+      }
+      
+      console.log(`Searching TripAdvisor for ${category} near ${latLong}`);
+      console.log('API URL (hiding key):', url.toString().replace(this.API_KEY, 'API_KEY_HIDDEN'));
+      
+      // Gọi API TripAdvisor
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('TripAdvisor API error:', errorText);
+        throw new Error(`Lỗi API TripAdvisor: ${response.status}`);
+      }
+      
+      const data: TripAdvisorSearchResponse = await response.json();
+      
+      // Phân tích cấu trúc dữ liệu trả về từ API
+      console.log('API Response Structure:', JSON.stringify(data).substring(0, 500) + '...');
+      
+      // Xử lý dữ liệu trả về
+      if (!data.data || !Array.isArray(data.data)) {
+        console.error('Unexpected response format:', data);
+        return [];
+      }
+      
+      // Trả về dữ liệu cơ bản với tọa độ gần đúng trước để có hiệu suất tốt hơn
+      const places = data.data.map((location: TripAdvisorLocation) => 
+        this.convertLocationToPlace(location, options.type, options.latitude, options.longitude)
+      );
+      
+      return places;
+    } catch (error) {
+      console.error('Error searching places with TripAdvisor:', error);
+      throw error;
     }
-    
-    const data = await response.json();
-    
-    // Phân tích cấu trúc dữ liệu trả về từ API
-    console.log('API Response Structure:', JSON.stringify(data).substring(0, 500) + '...');
-    
-    // Xử lý dữ liệu trả về
-    if (!data.data || !Array.isArray(data.data)) {
-      console.error('Unexpected response format:', data);
-      return [];
-    }
-    
-    // For better performance, return basic data with approximate coordinates first
-    const places = data.data.map((location: any) => 
-      this.convertLocationToPlace(location, options.type, options.latitude, options.longitude)
-    );
-    
-    return places;
-  } catch (error) {
-    console.error('Error searching places with TripAdvisor:', error);
-    throw error;
   }
-}
 
   /**
    * Tìm kiếm địa điểm với tọa độ chính xác (bằng cách lấy chi tiết cho mỗi địa điểm)
@@ -124,13 +152,17 @@ static async searchPlaces(options: TripAdvisorSearchOptions): Promise<Place[]> {
         })
       );
       
-      return placesWithCoordinates.filter(place => place !== null) as Place[];
+      return placesWithCoordinates.filter((place): place is Place => place !== null);
     } catch (error) {
       console.error('Error searching places with exact coordinates:', error);
       return [];
     }
   }
-  private static convertDetailResponseToPlace(data: any): Place {
+
+  /**
+   * Chuyển đổi dữ liệu chi tiết từ API sang định dạng Place
+   */
+  private static convertDetailResponseToPlace(data: TripAdvisorLocation): Place {
     // Xác định loại địa điểm
     const type = this.determinePlaceType(data);
   
@@ -155,7 +187,6 @@ static async searchPlaces(options: TripAdvisorSearchOptions): Promise<Place[]> {
       details: {
         address: address,
         description: data.description || '',
-        // Thêm các thông tin chi tiết khác nếu cần
         phone: data.phone,
         website: data.website
       }
@@ -163,6 +194,7 @@ static async searchPlaces(options: TripAdvisorSearchOptions): Promise<Place[]> {
   
     return place;
   }
+
   /**
    * Lấy chi tiết địa điểm từ TripAdvisor API
    */
@@ -180,7 +212,7 @@ static async searchPlaces(options: TripAdvisorSearchOptions): Promise<Place[]> {
       url.searchParams.append('language', 'vi');
       url.searchParams.append('currency', 'VND');
       
-      console.log(`Fetching details for location: ${url.toString()}`);
+      console.log(`Fetching details for location: ${locationId}`);
       
       // Gọi API TripAdvisor
       const response = await fetch(url.toString(), {
@@ -196,7 +228,7 @@ static async searchPlaces(options: TripAdvisorSearchOptions): Promise<Place[]> {
         throw new Error(`Lỗi API TripAdvisor: ${response.status}`);
       }
       
-      const data = await response.json();
+      const data: TripAdvisorLocation = await response.json();
       
       // Chuyển đổi dữ liệu từ API sang định dạng Place
       const place = this.convertDetailResponseToPlace(data);
@@ -255,7 +287,7 @@ static async searchPlaces(options: TripAdvisorSearchOptions): Promise<Place[]> {
    * Bổ sung tọa độ gốc để tính toán gần đúng vị trí cho tìm kiếm ban đầu
    */
   private static convertLocationToPlace(
-    location: any, 
+    location: TripAdvisorLocation, 
     type: PlaceType, 
     originLat: number, 
     originLng: number
@@ -329,27 +361,31 @@ static async searchPlaces(options: TripAdvisorSearchOptions): Promise<Place[]> {
     
     return place;
   }
-  private static determinePlaceType(data: any): PlaceType {
-    // Try to determine the type from the subtype data
+
+  /**
+   * Xác định loại địa điểm từ dữ liệu API
+   */
+  private static determinePlaceType(data: TripAdvisorLocation): PlaceType {
+    // Cố gắng xác định type từ dữ liệu subtype
     if (data.category?.name === 'restaurant' || 
-        (data.subcategory && data.subcategory.some((sub: any) => 
+        (data.subcategory && data.subcategory.some((sub) => 
           sub.name === 'restaurant' || sub.localized_name?.toLowerCase().includes('nhà hàng')))) {
       return 'restaurant';
     }
     
     if (data.category?.name === 'hotel' || 
-        (data.subcategory && data.subcategory.some((sub: any) => 
+        (data.subcategory && data.subcategory.some((sub) => 
           sub.name === 'hotel' || sub.localized_name?.toLowerCase().includes('khách sạn')))) {
       return 'hotel';
     }
     
     if (data.category?.name === 'attraction' || 
-        (data.subcategory && data.subcategory.some((sub: any) => 
+        (data.subcategory && data.subcategory.some((sub) => 
           sub.name === 'attraction' || sub.localized_name?.toLowerCase().includes('điểm du lịch')))) {
       return 'tourist_attraction';
     }
     
-    // Default to the category of the original request if we can't determine it
+    // Mặc định trả về restaurant nếu không xác định được
     return 'restaurant';
   }
 

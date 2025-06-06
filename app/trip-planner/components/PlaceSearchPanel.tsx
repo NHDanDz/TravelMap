@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { 
-  Search, Filter, MapPin, Clock, X, Star, 
+  Search, Filter, MapPin, Clock, Star, 
   Plus, Coffee, Utensils, Hotel, Landmark
 } from 'lucide-react';
 

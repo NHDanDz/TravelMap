@@ -3,15 +3,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Navigation, 
-  Clock, 
-  Route, 
+  Navigation,  
   MapPin, 
   X,
   ChevronDown,
   ChevronUp,
-  AlertCircle,
-  Loader2,
+  AlertCircle, 
   Play,
   Square,
   RotateCcw,

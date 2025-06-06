@@ -3,13 +3,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Clock, MapPin, Route, Check, X, Info, AlertTriangle,
-  Calendar, ArrowRight, Loader2, Zap, CheckCircle, ShieldAlert,
-  TrendingUp, Target, Award, Activity, Compass, Navigation,
-  Sun, Cloud, CloudRain, Thermometer, Wind, Star, Users,
-  Coffee, Utensils, Building, Landmark, DollarSign, Timer,
-  Sparkles, Brain, RefreshCw, BarChart3, PieChart, LineChart,
-  Map, Globe, Sliders, Filter, Settings2
+  Clock, MapPin, Check, X, Info, AlertTriangle,
+  Calendar, Zap, CheckCircle,
+  TrendingUp, Target, Award, Activity, Navigation,
+  Sun, Cloud, CloudRain, Star, Users,
+  Coffee, Utensils, Building, Landmark, DollarSign,
+  Sparkles, Brain, BarChart3,  
+  Map,  Settings2
 } from 'lucide-react';
 
 interface Place {

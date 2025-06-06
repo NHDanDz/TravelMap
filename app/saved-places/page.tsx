@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { 
-  MapPin, Compass, Search, Star, Heart, Trash2, Filter,
+  MapPin, Compass, Search, Star, Heart, Trash2, 
   Coffee, Hotel, Utensils, Landmark, Map, ChevronDown
 } from 'lucide-react';
 

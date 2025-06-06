@@ -7,12 +7,10 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { 
   ChevronLeft, Download, Printer, QrCode, Share, 
-  Calendar, Clock, MapPin, ArrowLeft, ArrowRight,
-  Star, Navigation, Globe, Camera, ExternalLink,
-  Users, DollarSign, Thermometer, Cloud, Sun, CloudRain,
-  Coffee, Utensils, Building, Landmark, Zap, Target,
-  Award, Activity, TrendingUp, BarChart3, LineChart,
-  Info, AlertCircle, CheckCircle2, RefreshCw, Eye
+  Calendar, Clock, MapPin, ArrowLeft,  
+  Star,  Globe, DollarSign, Cloud, Sun, CloudRain,
+  Coffee, Utensils, Building, Landmark, Zap,  
+  Activity, Info, AlertCircle,   RefreshCw
 } from 'lucide-react';
 
 // Enhanced interfaces with database fields

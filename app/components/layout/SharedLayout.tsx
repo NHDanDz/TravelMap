@@ -2,15 +2,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import { SiGoogleplay } from 'react-icons/si';
-import { FaApple } from 'react-icons/fa';
+import Link from 'next/link'; 
 import { 
-  MapPin, Compass, ArrowRight, Search, Star, 
-  Calendar, Users, Coffee, Hotel, Utensils, Landmark,
-  ChevronRight, Globe, Shield, Download, CheckCircle, 
-  Menu, X, User, LogOut, MessageCircle
+  MapPin, Compass, Star,  
+  Menu, X, User, LogOut
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { TravelChat } from '../chat/TravelChat';

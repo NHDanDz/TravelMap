@@ -3,10 +3,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Plus, Search, Edit, Trash2, MapPin, Star, Building2,
-  Filter, MoreVertical, ExternalLink, Image as ImageIcon,
-  Clock, Phone, Globe, AlertCircle, CheckCircle, X,
-  ChevronLeft, ChevronRight
+  Plus, Search, Edit, Trash2, MapPin, Star, ExternalLink, Image as ImageIcon,
+  AlertCircle, X, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 interface Place {

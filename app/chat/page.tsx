@@ -14,8 +14,7 @@ import {
   MapPin,
   Calendar,
   DollarSign,
-  Users,
-  MessageCircle,
+  Users, 
   Sparkles
 } from 'lucide-react';
 import { ChatService, ChatMessage, ChatSession } from '@/services/chatService';

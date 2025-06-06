@@ -4,7 +4,7 @@
 import React from 'react';
 import { 
   Coffee, Hotel, Utensils, Landmark, Beer, Pizza, 
-  UtensilsCrossed, Sandwich, School, Building2, Church,
+  UtensilsCrossed, Sandwich, Building2, Church,
   Music, ShoppingBag, Store, Building, HeartPulse, Search
 } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';

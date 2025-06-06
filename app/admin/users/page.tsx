@@ -4,8 +4,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Search, Users, Eye, UserCheck, UserX, Mail, Calendar,
-  MapPin, MessageSquare, Star, Briefcase, Shield, Ban,
-  MoreVertical, AlertCircle, X, Filter, Download
+  MessageSquare, Star, Briefcase, Shield, Ban,
+  AlertCircle, X, Download
 } from 'lucide-react';
 
 interface User {

@@ -6,12 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
 import { 
-  Calendar, Clock, MapPin, ChevronLeft, Navigation, 
-  Route, Play, Square, RotateCcw, Eye, EyeOff,
-  Layers, Settings, Maximize2, Minimize2, 
-  Compass, Star, Users, DollarSign, Activity,
-  ChevronDown, ChevronUp, Filter, Share, Download,
-  Loader2, RefreshCw, Target, Timer, Map
+  MapPin, ChevronLeft, Square, Eye, EyeOff, Maximize2, Minimize2, Activity,  Share,   Map
 } from 'lucide-react';
 import TripMapComponent from './components/TripMapComponent';
 import TripTimelinePanel from './components/TripTimelinePanel';

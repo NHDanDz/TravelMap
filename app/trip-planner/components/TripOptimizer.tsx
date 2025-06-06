@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Clock, MapPin, Route, Check, X, Info, AlertTriangle,
-  Calendar, ArrowRight, Loader2, Zap, CheckCircle, ShieldAlert
+  Clock, Route, Check, X, Info, AlertTriangle,
+  Calendar, Loader2, Zap, CheckCircle
 } from 'lucide-react';
 
 interface Place {
@@ -570,7 +570,7 @@ const TripOptimizer: React.FC<TripOptimizerProps> = ({
                 
                 <button
                   onClick={applyOptimization}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 inline-flex"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 items-center gap-2 inline-flex"
                 >
                   <Zap className="w-4 h-4" />
                   <span>Áp dụng thay đổi</span>

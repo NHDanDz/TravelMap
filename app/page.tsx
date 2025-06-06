@@ -1,16 +1,14 @@
 // app/page.tsx
 'use client';
-
-import React, { useState, useEffect } from 'react';
+ 
 import Link from 'next/link';
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import Image from 'next/image'; 
 import { SiGoogleplay } from 'react-icons/si';
 import { FaApple } from 'react-icons/fa';
 import { 
-  MapPin, Compass, ArrowRight, Search, Star, 
-  Calendar, Users, Coffee, Hotel, Utensils, Landmark,
-  ChevronRight, Globe, Shield, Download, CheckCircle
+  MapPin, ArrowRight, Search, Star, 
+  Calendar, Coffee, Hotel, Utensils, Landmark,
+  ChevronRight, CheckCircle
 } from 'lucide-react';
 import SharedLayout from './components/layout/SharedLayout';
 

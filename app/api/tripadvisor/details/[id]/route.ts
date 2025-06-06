@@ -1,8 +1,7 @@
 // app/api/tripadvisor/details/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { TripAdvisorService } from '@/services/tripAdvisorService';
-import { PlayCircle } from 'lucide-react';
-
+ 
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }

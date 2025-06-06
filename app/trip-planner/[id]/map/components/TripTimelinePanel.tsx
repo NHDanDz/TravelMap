@@ -3,11 +3,10 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { 
-  Calendar, Clock, MapPin, Star, Route, Eye, EyeOff,
-  ChevronDown, ChevronUp, Activity, Users, DollarSign,
-  Utensils, Coffee, Building, Landmark, ShoppingBag,
-  Navigation, Camera, Globe, Timer, Target
+import {  
+   Clock, MapPin, Star, Route,  
+  ChevronDown, ChevronUp,  
+  Utensils, Coffee, Building, Landmark, ShoppingBag,  Timer
 } from 'lucide-react';
 
 // Types

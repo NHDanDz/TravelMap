@@ -12,8 +12,7 @@ import {
   MapPin, 
   Navigation, 
   Bookmark, 
-  Share, 
-  Heart,
+  Share,  
   DollarSign,
   Info,
   MessageCircle,
@@ -22,12 +21,6 @@ import {
   ExternalLink,
   User,
   Calendar,
-  Award,
-  Wifi,
-  Car,
-  CreditCard,
-  Coffee,
-  Utensils,
   Loader2
 } from 'lucide-react';
 import { Place } from '../types';

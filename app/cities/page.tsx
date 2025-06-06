@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { MapPin, Calendar, Users, Search, Filter, Grid, List } from 'lucide-react';
+import { MapPin, Search, Grid, List } from 'lucide-react';
 import SharedLayout from '../components/layout/SharedLayout';
 
 interface City {

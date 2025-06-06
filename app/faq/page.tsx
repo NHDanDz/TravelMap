@@ -4,9 +4,9 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { 
-  HelpCircle, Search, ChevronDown, ChevronUp, Compass,
+  HelpCircle, Search, ChevronDown, ChevronUp,
   MapPin, Calendar, Lock, CreditCard, User, MessageSquare,
-  Mail, Star, Info
+  Mail, Info
 } from 'lucide-react';
 
 interface FAQCategory {

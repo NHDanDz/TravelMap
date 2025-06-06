@@ -4,13 +4,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { 
-  Search, Filter, MapPin, Clock, X, Star, 
+  Search, MapPin, Clock, X, Star, 
   Plus, Coffee, Utensils, Hotel, Landmark,
-  ChevronDown, ChevronUp, SlidersHorizontal,
-  Navigation, Globe, Camera, Heart, ExternalLink,
-  DollarSign, Users, Calendar, Thermometer,
-  Award, TrendingUp, Zap, Target, Activity,
-  RefreshCw, AlertCircle, CheckCircle2, Loader2,
+  ChevronDown,  SlidersHorizontal,
+  Navigation, ExternalLink,
+  DollarSign, Zap, AlertCircle, Loader2,
   Building, ShoppingBag, Trees, Music2, Umbrella
 } from 'lucide-react';
 
@@ -331,133 +329,228 @@ const EnhancedPlaceSearchPanel: React.FC<PlaceSearchProps> = ({
   }, []);
 
   // Search places function
-  const searchPlaces = useCallback(async (resetPage = true) => {
-    console.log('🔍 === SEARCH PLACES DEBUG ===');
-    console.log('Parameters:', {
-      searchQuery: searchQuery || 'none',
-      selectedType: selectedType || 'none',
-      cityId: cityId || 'none',
-      cityInfo: cityInfo?.name || 'none',
-      selectedRating: selectedRating || 'none',
-      selectedPriceLevel: selectedPriceLevel || 'none',
-      sortBy,
-      page: resetPage ? 1 : page,
-      resetPage
-    });
+  // Phần searchPlaces function cải thiện trong EnhancedPlaceSearchPanel.tsx
 
-    if (resetPage) {
-      setPage(1);
-      setPlaces([]);
+const searchPlaces = useCallback(async (resetPage = true) => {
+  console.log('🔍 === SEARCH PLACES DEBUG ===');
+  console.log('Parameters:', {
+    searchQuery: searchQuery || 'none',
+    selectedType: selectedType || 'none',
+    cityId: cityId || 'none',
+    cityInfo: cityInfo?.name || 'none',
+    selectedRating: selectedRating || 'none',
+    selectedPriceLevel: selectedPriceLevel || 'none',
+    sortBy,
+    page: resetPage ? 1 : page,
+    resetPage
+  });
+
+  if (resetPage) {
+    setPage(1);
+    setPlaces([]); // ✅ Clear places khi reset
+  }
+  
+  setLoading(true);
+  setError(null);
+  
+  try {
+    const params = new URLSearchParams();
+    
+    // Add search query
+    if (searchQuery && searchQuery.trim()) {
+      params.append('search', searchQuery.trim());
     }
     
-    setLoading(true);
-    setError(null);
+    // Add category filter - chính xác hơn
+    if (selectedType && selectedType.trim()) {
+      params.append('category', selectedType.trim());
+    }
     
-    try {
-      const params = new URLSearchParams();
+    // Add city filter using city name - chính xác hơn
+    if (cityInfo?.name && cityInfo.name.trim()) {
+      params.append('city', cityInfo.name.trim());
+    }
+    
+    // Add pagination
+    const currentPage = resetPage ? 1 : page;
+    params.append('page', currentPage.toString());
+    params.append('limit', '20');
+    
+    const url = `/api/places?${params.toString()}`;
+    console.log('🌐 API URL:', url);
+    
+    const response = await fetch(url);
+    console.log('📡 Response status:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ API Error:', errorText);
+      throw new Error(`API Error: ${response.status} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    console.log('📋 Raw API response structure:', Object.keys(data));
+    
+    // ✅ Handle response structure properly
+    let placesData: DatabasePlace[] = [];
+    let paginationInfo = null;
+    
+    if (data.places && Array.isArray(data.places)) {
+      placesData = data.places;
+      paginationInfo = data.pagination;
+    } else if (Array.isArray(data)) {
+      placesData = data;
+    } else {
+      console.warn('⚠️ Unexpected response structure:', data);
+      placesData = [];
+    }
+    
+    console.log('📍 Places received from API:', placesData.length);
+    
+    // ✅ Detect and log duplicates before conversion
+    const apiIds = placesData.map(p => p.id);
+    const uniqueApiIds = [...new Set(apiIds)];
+    
+    if (apiIds.length !== uniqueApiIds.length) {
+      console.error('🚨 API returned duplicate places!', {
+        total: apiIds.length,
+        unique: uniqueApiIds.length,
+        duplicates: apiIds.length - uniqueApiIds.length,
+        duplicateIds: apiIds.filter((id, index) => apiIds.indexOf(id) !== index)
+      });
       
-      // Add search query
-      if (searchQuery && searchQuery.trim()) {
-        params.append('search', searchQuery.trim());
-      }
+      // Remove duplicates from API data
+      placesData = placesData.filter((place, index, array) => {
+        return array.findIndex(p => p.id === place.id) === index;
+      });
+      console.log('✅ Cleaned API data:', placesData.length, 'unique places');
+    }
+    
+    // Convert to component format
+    const convertedPlaces = placesData.map(convertDatabasePlace);
+    console.log('🔄 Converted places:', convertedPlaces.length);
+    
+    // ✅ Final duplicate check after conversion
+    const convertedIds = convertedPlaces.map(p => p.id);
+    const uniqueConvertedIds = [...new Set(convertedIds)];
+    
+    if (convertedIds.length !== uniqueConvertedIds.length) {
+      console.error('🚨 Duplicates found after conversion!', {
+        total: convertedIds.length,
+        unique: uniqueConvertedIds.length
+      });
       
-      // Add category filter
-      if (selectedType) {
-        params.append('category', selectedType);
-      }
+      // This should not happen if API is fixed, but just in case
+      const finalUniquePlaces = convertedPlaces.filter((place, index, array) => {
+        return array.findIndex(p => p.id === place.id) === index;
+      });
       
-      // Add city filter using city name
-      if (cityInfo?.name) {
-        params.append('city', cityInfo.name);
-      }
-      
-      // Add pagination
-      params.append('page', resetPage ? '1' : page.toString());
-      params.append('limit', '20');
-      
-      const url = `/api/places?${params.toString()}`;
-      console.log('🌐 API URL:', url);
-      
-      const response = await fetch(url);
-      console.log('📡 Response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ API Error:', errorText);
-        throw new Error(`API Error: ${response.status} - ${errorText}`);
-      }
-      
-      const data = await response.json();
-      console.log('📋 Raw API response:', data);
-      
-      // Handle different response structures
-      let placesData: DatabasePlace[] = [];
-      let paginationInfo = null;
-      
-      if (Array.isArray(data)) {
-        placesData = data;
-      } else if (data.places && Array.isArray(data.places)) {
-        placesData = data.places;
-        paginationInfo = data.pagination;
-      } else if (data.data && Array.isArray(data.data)) {
-        placesData = data.data;
-        paginationInfo = data.pagination;
-      } else {
-        console.warn('⚠️ Unexpected response structure:', data);
-        placesData = [];
-      }
-      
-      console.log('📍 Places found:', placesData.length);
-      console.log('📄 Pagination info:', paginationInfo);
-      
-      // Convert to component format
-      const convertedPlaces = placesData.map(convertDatabasePlace);
-      console.log('🔄 Converted places:', convertedPlaces);
+      console.log('✅ Final cleanup:', finalUniquePlaces.length, 'unique places');
       
       // Update state
       if (resetPage) {
+        setPlaces(finalUniquePlaces);
+      } else {
+        setPlaces(prev => {
+          const combined = [...prev, ...finalUniquePlaces];
+          // ✅ Remove duplicates between old and new data
+          const uniqueCombined = combined.filter((place, index, array) => {
+            return array.findIndex(p => p.id === place.id) === index;
+          });
+          
+          console.log('📊 Load more with dedup:', {
+            previous: prev.length,
+            new: finalUniquePlaces.length,
+            combined: combined.length,
+            uniqueCombined: uniqueCombined.length,
+            duplicatesRemoved: combined.length - uniqueCombined.length
+          });
+          
+          return uniqueCombined;
+        });
+      }
+    } else {
+      // No duplicates - normal flow
+      if (resetPage) {
         setPlaces(convertedPlaces);
       } else {
-        setPlaces(prev => [...prev, ...convertedPlaces]);
+        setPlaces(prev => {
+          const combined = [...prev, ...convertedPlaces];
+          // ✅ Still check for duplicates between old and new
+          const uniqueCombined = combined.filter((place, index, array) => {
+            return array.findIndex(p => p.id === place.id) === index;
+          });
+          
+          if (combined.length !== uniqueCombined.length) {
+            console.warn('🔧 Removed overlapping places:', combined.length - uniqueCombined.length);
+          }
+          
+          return uniqueCombined;
+        });
       }
-      
-      // Handle pagination
-      if (paginationInfo) {
-        setHasMore(paginationInfo.page < paginationInfo.totalPages);
-        setTotalResults(paginationInfo.total);
-      } else {
-        setHasMore(convertedPlaces.length === 20);
-        setTotalResults(convertedPlaces.length);
-      }
-      
-      // Update debug info
-      setDebugInfo({
-        searchQuery,
-        selectedType,
-        cityName: cityInfo?.name,
-        placesFound: convertedPlaces.length,
-        totalResults: paginationInfo?.total || convertedPlaces.length,
-        apiUrl: url,
-        responseStructure: Object.keys(data)
-      });
-      
-      console.log('✅ Search completed successfully');
-      
-    } catch (error) {
-      console.error('❌ Search error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      setError(`Lỗi tìm kiếm: ${errorMessage}`);
-      setDebugInfo({
-        error: errorMessage,
-        searchQuery,
-        selectedType,
-        cityName: cityInfo?.name
-      });
-    } finally {
-      setLoading(false);
     }
-  }, [searchQuery, selectedType, cityInfo, selectedRating, selectedPriceLevel, sortBy, page]);
+    
+    // Handle pagination
+if (paginationInfo) {
+  // ✅ Tính toán dựa trên total vs current count
+  const total = paginationInfo.total || 0;
+  const currentCount = resetPage ? convertedPlaces.length : (places.length + convertedPlaces.length);
+  
+  setHasMore(currentCount < total); // ← FIX CHÍNH Ở ĐÂY
+  setTotalResults(total);
+} else {
+  setHasMore(convertedPlaces.length >= 20); // ← FIX PHỤ
+  setTotalResults(convertedPlaces.length);
+}
 
+    
+    // Update debug info
+    setDebugInfo({
+      searchQuery,
+      selectedType,
+      cityName: cityInfo?.name,
+      placesFound: convertedPlaces.length,
+      totalResults: paginationInfo?.total || convertedPlaces.length,
+      apiUrl: url,
+      responseStructure: Object.keys(data),
+      duplicatesDetected: apiIds.length !== uniqueApiIds.length,
+      duplicatesCount: apiIds.length - uniqueApiIds.length
+    });
+    
+    console.log('✅ Search completed successfully');
+    
+  } catch (error) {
+    console.error('❌ Search error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    setError(`Lỗi tìm kiếm: ${errorMessage}`);
+    setDebugInfo({
+      error: errorMessage,
+      searchQuery,
+      selectedType,
+      cityName: cityInfo?.name
+    });
+  } finally {
+    setLoading(false);
+  }
+}, [searchQuery, selectedType, cityInfo, selectedRating, selectedPriceLevel, sortBy, page]);
+
+// ✅ Cải thiện render function để sử dụng unique key
+{places.map((place, index) => {
+  const typeConfig = getPlaceTypeConfig(place.type);
+  const timeSuggestion = generateTimeSuggestion(index);
+  
+  // ✅ Tạo unique key chắc chắn không trùng
+  const uniqueKey = `place-${place.id}-${index}-${place.name.replace(/[^a-zA-Z0-9]/g, '')}`;
+  
+  return (
+    <div 
+      key={uniqueKey} // ✅ Sử dụng unique key
+      className="p-4 hover:bg-gray-50 transition-colors group"
+    >
+      {/* Rest of component */}
+    </div>
+  );
+})}
   // Debounced search effect
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -774,14 +867,14 @@ const EnhancedPlaceSearchPanel: React.FC<PlaceSearchProps> = ({
               >
                 Xóa bộ lọc
               </button>
-              {process.env.NODE_ENV === 'development' && (
+              {/* {process.env.NODE_ENV === 'development' && (
                 <button
                   onClick={testAPI}
                   className="px-4 py-2 text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors"
                 >
                   Kiểm tra API
                 </button>
-              )}
+              )} */}
             </div>
           </div>
         )}
@@ -997,7 +1090,7 @@ const EnhancedPlaceSearchPanel: React.FC<PlaceSearchProps> = ({
           </div>
         </div>
 
-        {/* Debug panel in development */}
+        {/* Debug panel in development
         {process.env.NODE_ENV === 'development' && debugInfo && (
           <details className="mt-3">
             <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">
@@ -1009,7 +1102,7 @@ const EnhancedPlaceSearchPanel: React.FC<PlaceSearchProps> = ({
               </pre>
             </div>
           </details>
-        )}
+        )} */}
       </div>
     </div>
   );

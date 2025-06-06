@@ -6,8 +6,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import { 
-  MapPin, ArrowLeft, Star, Phone, Globe, Clock, DollarSign, 
-  Camera, Navigation, User, Calendar, MessageCircle, 
+  MapPin, ArrowLeft, Star, Phone, Globe, Clock,
+  Camera, Navigation, User, MessageCircle, 
   Coffee, Hotel, Utensils, Landmark, Share, Heart, ExternalLink
 } from 'lucide-react';
 import SharedLayout from '../../components/layout/SharedLayout';

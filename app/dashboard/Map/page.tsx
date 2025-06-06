@@ -1,21 +1,17 @@
 // app/dashboard/Map/page.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { 
   Compass, 
   MapPin, 
-  Search, 
-  Filter, 
+  Search,  
   Navigation, 
   Bookmark,
-  Settings,
-  Plus,
-  X,
-  Loader2,
-  Globe,
-  Route,
+  Settings, 
+  X, 
+  Globe, 
   Star
 } from 'lucide-react';
 import { AuthService } from '@/lib/auth';

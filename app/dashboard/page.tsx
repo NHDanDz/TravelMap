@@ -5,7 +5,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { Compass, Map as MapIcon } from 'lucide-react';
+import { Map as MapIcon } from 'lucide-react';
 
 export default function DashboardPage() {
   // Import CSS cho Leaflet chỉ tại component này

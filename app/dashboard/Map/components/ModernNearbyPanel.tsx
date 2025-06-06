@@ -18,8 +18,7 @@ import {
   HeartPulse,
   Filter,
   RefreshCw,
-  X,
-  TrendingUp
+  X, 
 } from 'lucide-react';
 import { Place, PlaceType } from '../types';
 

@@ -10,8 +10,7 @@ import {
   MapPin, 
   Star, 
   DollarSign,
-  Info,
-  MessageCircle,
+  Info, 
   Camera,
   ThumbsUp,
   X

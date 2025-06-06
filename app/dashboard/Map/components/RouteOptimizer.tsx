@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { GripVertical, MapPin, RotateCw, Navigation } from 'lucide-react';
+import { GripVertical, RotateCw, Navigation } from 'lucide-react';
 import { Place } from '../types';
 
 interface RouteOptimizerProps {

@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, Search, Edit, Trash2, Building2, MapPin, Globe,
-  Image as ImageIcon, AlertCircle, X, CheckCircle, Eye
+  Image as ImageIcon, AlertCircle, X, CheckCircle 
 } from 'lucide-react';
 
 interface City {

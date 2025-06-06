@@ -6,8 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import SharedLayout from '@/app/components/layout/SharedLayout';
 import { 
-  Compass, Users, Globe, MapPin, Award, 
-  Coffee, Building, Landmark, Map, Star 
+  Compass, Globe, MapPin,   Map, Star 
 } from 'lucide-react';
 
 const AboutPage = () => {

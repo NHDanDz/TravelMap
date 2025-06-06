@@ -1,11 +1,11 @@
 // app/admin/weather/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  CloudRain, Search, Plus, Edit, Trash2, Download, Upload,
+  CloudRain, Search, Plus, Edit, Trash2, Download,
   Sun, Cloud, CloudSnow, Thermometer, Droplets, Wind,
-  Calendar, MapPin, RefreshCw, AlertCircle, X, Eye,
+  Calendar, MapPin, RefreshCw, AlertCircle, X,  
   TrendingUp, TrendingDown, Activity, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
@@ -116,19 +116,19 @@ const AdminWeatherPage = () => {
     windy: 'Có gió'
   };
 
-  // Load data when filters or pagination change
+  // Load data when server-side filters or pagination change
   useEffect(() => {
     fetchData();
   }, [pagination.page, selectedCity, selectedCondition, dateRange, sortBy]);
 
-  // Reset to page 1 when filters change
+  // Reset to page 1 when server-side filters change (excluding searchTerm)
   useEffect(() => {
     if (pagination.page !== 1) {
       setPagination(prev => ({ ...prev, page: 1 }));
     } else {
       fetchData();
     }
-  }, [searchTerm, selectedCity, selectedCondition, dateRange]);
+  }, [selectedCity, selectedCondition, dateRange]); // Removed searchTerm from dependencies
 
   // Load cities and stats on mount
   useEffect(() => {
@@ -199,16 +199,38 @@ const AdminWeatherPage = () => {
     }
   };
 
-  // Client-side filtering for search term (since it's not handled by API)
-  const filteredData = weatherData.filter(item => {
-    if (!searchTerm) return true;
+  // Client-side filtering for search term with debouncing effect
+  const filteredData = useMemo(() => {
+    if (!searchTerm.trim()) return weatherData;
     
     const searchLower = searchTerm.toLowerCase();
-    return (
+    return weatherData.filter(item => 
       item.city.name.toLowerCase().includes(searchLower) ||
       item.city.country.toLowerCase().includes(searchLower)
     );
-  });
+  }, [weatherData, searchTerm]);
+
+  // Debounced search term to improve performance
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300); // 300ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Use debounced search term for actual filtering
+  const finalFilteredData = useMemo(() => {
+    if (!debouncedSearchTerm.trim()) return weatherData;
+    
+    const searchLower = debouncedSearchTerm.toLowerCase();
+    return weatherData.filter(item => 
+      item.city.name.toLowerCase().includes(searchLower) ||
+      item.city.country.toLowerCase().includes(searchLower)
+    );
+  }, [weatherData, debouncedSearchTerm]);
 
   const resetForm = () => {
     setFormData({
@@ -576,7 +598,7 @@ const AdminWeatherPage = () => {
           </select>
           
           <div className="text-sm text-gray-600 flex items-center">
-            Hiển thị: {filteredData.length} / {pagination.total}
+            Hiển thị: {finalFilteredData.length} / {pagination.total}
           </div>
         </div>
       </div>
@@ -611,7 +633,7 @@ const AdminWeatherPage = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredData.map((weather) => (
+              {finalFilteredData.map((weather) => (
                 <tr key={weather.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <div>
@@ -708,7 +730,7 @@ const AdminWeatherPage = () => {
           </table>
         </div>
         
-        {filteredData.length === 0 && !loading && (
+        {finalFilteredData.length === 0 && !loading && (
           <div className="text-center py-12">
             <CloudRain className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">Không tìm thấy dữ liệu thời tiết</h3>
@@ -1058,4 +1080,4 @@ const AdminWeatherPage = () => {
   );
 };
 
-export default AdminWeatherPage; 
+export default AdminWeatherPage;

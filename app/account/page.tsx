@@ -6,7 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { 
     User, Edit, MapPin, Heart, Clock, Settings, LogOut, Lock, 
-    Camera, Award, Shield, Bell, Compass, UserCheck, Star, Calendar, 
+    Camera, Award,  Compass, UserCheck, Star, Calendar, 
     ThumbsUp, Trash, Map, Loader2
   } from 'lucide-react';
 import { useRouter } from 'next/navigation';  

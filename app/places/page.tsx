@@ -5,8 +5,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { 
-  MapPin, Search, Filter, Grid, List, Star, 
-  Coffee, Hotel, Utensils, Landmark, Phone, Globe, Clock, DollarSign
+  MapPin, Search, Grid, List, Star, 
+  Coffee, Hotel, Utensils, Landmark, Clock
 } from 'lucide-react';
 import SharedLayout from '../components/layout/SharedLayout';
 
