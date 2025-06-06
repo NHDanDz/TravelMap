@@ -104,22 +104,34 @@ const AdminReviewsPage = () => {
     }
   };
 
-  const getDateRangeFilter = () => {
-    const now = new Date();
-    switch (dateRange) {
-      case 'today':
-        return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      case 'week':
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        return weekAgo;
-      case 'month':
-        return new Date(now.getFullYear(), now.getMonth(), 1);
-      case 'year':
-        return new Date(now.getFullYear(), 0, 1);
-      default:
-        return null;
-    }
-  };
+const getDateRangeFilter = () => {
+  // Tạo ngày hiện tại theo Vietnam timezone (UTC+7)
+  const now = new Date();
+  const vietnamNow = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+  
+  switch (dateRange) {
+    case 'today':
+      // Ngày hôm nay theo Vietnam timezone
+      const today = new Date(vietnamNow.getFullYear(), vietnamNow.getMonth(), vietnamNow.getDate());
+      return today;
+      
+    case 'week':
+      // 7 ngày trước theo Vietnam timezone
+      const weekAgo = new Date(vietnamNow.getTime() - 7 * 24 * 60 * 60 * 1000);
+      return new Date(weekAgo.getFullYear(), weekAgo.getMonth(), weekAgo.getDate());
+      
+    case 'month':
+      // Đầu tháng hiện tại theo Vietnam timezone
+      return new Date(vietnamNow.getFullYear(), vietnamNow.getMonth(), 1);
+      
+    case 'year':
+      // Đầu năm hiện tại theo Vietnam timezone
+      return new Date(vietnamNow.getFullYear(), 0, 1);
+      
+    default:
+      return null;
+  }
+};
 
   const filteredReviews = reviews.filter(review => {
     const matchesSearch = review.place.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

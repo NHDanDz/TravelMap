@@ -198,22 +198,30 @@ const getPriceLevelIndicator = (level?: number) => {
 
 // Toast notification system
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+  // Remove any existing toasts
+  const existingToasts = document.querySelectorAll('.toast-notification');
+  existingToasts.forEach(toast => toast.remove());
+
   const toast = document.createElement('div');
-  toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg text-white z-50 transform transition-all duration-300 flex items-center space-x-2 ${
+  toast.className = `toast-notification fixed top-4 right-4 px-6 py-3 rounded-lg text-white z-[100] transform transition-all duration-300 flex items-center space-x-2 ${
     type === 'success' ? 'bg-green-500' : 
     type === 'error' ? 'bg-red-500' : 
     'bg-blue-500'
   }`;
   
   const icon = type === 'success' ? '✓' : type === 'error' ? '✗' : 'ℹ';
-  toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+  toast.innerHTML = `<span class="font-semibold">${icon}</span><span>${message}</span>`;
   
+  // Initially position off-screen
+  toast.style.transform = 'translateX(100%)';
   document.body.appendChild(toast);
   
+  // Animate in
   setTimeout(() => {
     toast.style.transform = 'translateX(0)';
   }, 100);
   
+  // Auto remove after 3 seconds
   setTimeout(() => {
     toast.style.transform = 'translateX(100%)';
     setTimeout(() => {
@@ -223,7 +231,6 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'succes
     }, 300);
   }, 3000);
 };
-
 // Loading component
 const LoadingSpinner = () => (
   <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -895,41 +902,158 @@ export default function TripDetailsPage() {
     
     setTrip({ ...trip, days: newDays });
   };
-
-  // Handle add suggested place
-  const handleAddSuggestedPlace = (dbPlace: DatabasePlace, dayNumber: number) => {
-    if (!trip) return;
+const generateEmptyDays = (startDate: string, numDays: number): Day[] => {
+  const days: Day[] = [];
+  const start = new Date(startDate);
+  
+  for (let i = 0; i < numDays; i++) {
+    const dayDate = new Date(start);
+    dayDate.setDate(start.getDate() + i);
     
-    const convertedPlace: Place = {
-      id: `place_${dbPlace.id}_${Date.now()}`,
-      name: dbPlace.name,
-      type: dbPlace.category?.name || 'tourist_attraction',
-      address: dbPlace.address || '',
-      latitude: dbPlace.latitude?.toString() || '0',
-      longitude: dbPlace.longitude?.toString() || '0',
-      image: dbPlace.photos?.[0]?.url || dbPlace.imageUrl || '/images/place-default.jpg',
-      rating: dbPlace.rating ? parseFloat(dbPlace.rating.toString()) : undefined,
-      category: dbPlace.category,
-      photos: dbPlace.photos,
-      description: dbPlace.description,
-      openingHours: dbPlace.openingHours,
-      avgDurationMinutes: dbPlace.avgDurationMinutes,
-      priceLevel: dbPlace.priceLevel ? parseInt(dbPlace.priceLevel) : undefined,
-      website: dbPlace.website,
-      contactInfo: dbPlace.contactInfo
+    days.push({
+      dayNumber: i + 1,
+      date: dayDate.toISOString().split('T')[0],
+      places: [] // Empty places array
+    });
+  }
+  
+  console.log('Generated empty days:', days);
+  return days;
+};
+  // Handle add suggested place
+  // Handle add suggested place - FIXED VERSION
+const handleAddSuggestedPlace = (dbPlace: DatabasePlace, dayNumber: number) => {
+   console.log('=== DEBUG handleAddSuggestedPlace ===');
+  console.log('Input dayNumber:', dayNumber);
+  console.log('trip?.days:', trip?.days);
+  
+  if (!trip) {
+    console.error('Trip is null');
+    showToast('Lỗi: Không tìm thấy thông tin chuyến đi!', 'error');
+    return;
+  }
+  
+  // 🔧 CHECK: If trip has no days, generate them
+  if (!trip.days || trip.days.length === 0) {
+    console.warn('Trip has no days, generating empty days...');
+    
+    // Calculate days from startDate and endDate
+    const start = new Date(trip.startDate);
+    const end = new Date(trip.endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const numDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    
+    const emptyDays = generateEmptyDays(trip.startDate, numDays);
+    
+    // Update trip with generated days
+    const updatedTrip = { ...trip, days: emptyDays };
+    setTrip(updatedTrip);
+    
+    // Show info message
+    showToast('Đã tạo các ngày trống cho lịch trình!', 'info');
+    
+    // Retry adding place with updated trip
+    setTimeout(() => {
+      handleAddSuggestedPlace(dbPlace, dayNumber);
+    }, 100);
+    return;
+  }
+  
+  console.log('Adding suggested place:', dbPlace);
+  console.log('To day number:', dayNumber);
+  
+  // Helper function to convert price level string to number
+  const convertPriceLevel = (priceLevel?: string): number | undefined => {
+    if (!priceLevel) return undefined;
+    
+    const priceLevelMap: Record<string, number> = {
+      'cheap': 1,
+      'moderate': 2,
+      'expensive': 3,
+      'luxury': 4,
+      '$': 1,
+      '$$': 2,
+      '$$$': 3,
+      '$$$$': 4
     };
     
-    const dayIndex = trip.days.findIndex(day => day.dayNumber === dayNumber);
-    if (dayIndex !== -1) {
-      const newDays = [...trip.days];
-      newDays[dayIndex] = {
-        ...newDays[dayIndex],
-        places: [...newDays[dayIndex].places, convertedPlace]
-      };
-      setTrip({ ...trip, days: newDays });
-      showToast(`Đã thêm ${dbPlace.name} vào ngày ${dayNumber}!`, 'success');
+    // If it's already a number string, parse it
+    const numValue = parseInt(priceLevel);
+    if (!isNaN(numValue) && numValue >= 1 && numValue <= 4) {
+      return numValue;
     }
+    
+    // Otherwise use the mapping
+    return priceLevelMap[priceLevel.toLowerCase()] || 2;
   };
+
+  // Convert DatabasePlace to Place format
+  const convertedPlace: Place = {
+    id: `suggested_${dbPlace.id}_${Date.now()}`,
+    name: dbPlace.name,
+    type: dbPlace.category?.name || 'tourist_attraction',
+    address: dbPlace.address || '',
+    latitude: dbPlace.latitude?.toString() || '0',
+    longitude: dbPlace.longitude?.toString() || '0',
+    image: dbPlace.photos?.[0]?.url || dbPlace.imageUrl || '/images/place-default.jpg',
+    rating: dbPlace.rating ? parseFloat(dbPlace.rating.toString()) : undefined,
+    category: dbPlace.category,
+    photos: dbPlace.photos,
+    description: dbPlace.description,
+    openingHours: dbPlace.openingHours,
+    avgDurationMinutes: dbPlace.avgDurationMinutes,
+    duration: dbPlace.avgDurationMinutes || 60,
+    priceLevel: convertPriceLevel(dbPlace.priceLevel),
+    website: dbPlace.website,
+    contactInfo: dbPlace.contactInfo
+  };
+  
+  // Find the day to add the place to
+  const dayIndex = trip.days.findIndex(day => day.dayNumber === dayNumber);
+  
+  if (dayIndex === -1) {
+    console.error('Day not found:', dayNumber);
+    showToast(`Lỗi: Không tìm thấy ngày ${dayNumber}!`, 'error');
+    return;
+  }
+  
+  // Check if place already exists in this day
+  const existingPlace = trip.days[dayIndex].places.find(p => 
+    p.name.toLowerCase() === dbPlace.name.toLowerCase() &&
+    Math.abs(parseFloat(p.latitude) - dbPlace.latitude) < 0.001 &&
+    Math.abs(parseFloat(p.longitude) - dbPlace.longitude) < 0.001
+  );
+  
+  if (existingPlace) {
+    showToast(`${dbPlace.name} đã có trong ngày ${dayNumber}!`, 'info');
+    return;
+  }
+  
+  try {
+    // Create new days array with the added place
+    const newDays = [...trip.days];
+    newDays[dayIndex] = {
+      ...newDays[dayIndex],
+      places: [...newDays[dayIndex].places, convertedPlace]
+    };
+    
+    // Update trip state
+    const updatedTrip = { ...trip, days: newDays };
+    setTrip(updatedTrip);
+    
+    console.log('Successfully added place to trip');
+    showToast(`Đã thêm ${dbPlace.name} vào ngày ${dayNumber}!`, 'success');
+    
+    // Auto switch to the day where place was added
+    if (activeDay !== dayNumber) {
+      setActiveDay(dayNumber);
+    }
+    
+  } catch (error) {
+    console.error('Error adding place to trip:', error);
+    showToast('Lỗi khi thêm địa điểm!', 'error');
+  }
+};
 
   // Handle save
 // Replace the existing handleSave function with this improved version

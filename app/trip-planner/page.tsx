@@ -596,7 +596,24 @@ const sampleTrips: Trip[] = [
     travelCompanions: 4
   }
 ];
-
+const generateEmptyDays = (startDate: string, numDays: number): Day[] => {
+  const days: Day[] = [];
+  const start = new Date(startDate);
+  
+  for (let i = 0; i < numDays; i++) {
+    const dayDate = new Date(start);
+    dayDate.setDate(start.getDate() + i);
+    
+    days.push({
+      dayNumber: i + 1,
+      date: dayDate.toISOString().split('T')[0],
+      places: [] // Empty places array
+    });
+  }
+  
+  console.log('Generated empty days:', days);
+  return days;
+};
 // Helper functions
 const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
@@ -873,6 +890,9 @@ const handleCreateTrip = async (e: React.FormEvent) => {
   } else {
     // Manual trip creation flow
     try {
+      // ✅ Generate empty days for manual trip
+      const emptyDays = generateEmptyDays(newTrip.startDate, diffDays);
+      
       const tripData = {
         name: newTrip.name || `Khám phá ${newTrip.destination}`,
         destination: newTrip.destination,
@@ -880,15 +900,18 @@ const handleCreateTrip = async (e: React.FormEvent) => {
         endDate: newTrip.endDate,
         description: newTrip.description,
         userId: userId,
-        status: 'draft' as const
+        status: 'draft' as const,
+        days: emptyDays // ✅ Add empty days to manual trip
       };
+      
+      console.log('Creating manual trip with days:', tripData);
       
       // Create trip in database
       const result = await TripService.createTrip(tripData);
       
       // Success - navigate to trip detail
       resetForm();
-      router.push(`/trip-planner/${result.id}`);
+      router.push(`/trip-planner/${result.id}?showSuggestions=true`); // ✅ Auto-show suggestions
       
     } catch (error) {
       console.error('Error creating manual trip:', error);
